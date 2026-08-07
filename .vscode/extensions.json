@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "platformio.platformio-ide",
+    "anthropic.claude-code",
+    "ms-vscode.cpptools"
+  ],
+  "unwantedRecommendations": [
+    "ms-vscode.cpptools-extension-pack"
+  ]
+}

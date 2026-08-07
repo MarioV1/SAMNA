@@ -1,0 +1,28 @@
+# ── PlatformIO ───────────────────────────────────────────────
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+
+# ── Credenciales — NUNCA subir ───────────────────────────────
+**/include/secrets.h
+**/src/secrets.h
+
+# ── VS Code ──────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ── Claude Code ──────────────────────────────────────────────
+.claude/settings.local.json
+
+# ── Sistema ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ── Datos de pruebas (opcional: quitar si quieres versionarlos)
+/datos/*.csv
+/datos/*.log

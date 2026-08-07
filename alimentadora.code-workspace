@@ -1,0 +1,48 @@
+{
+  "folders": [
+    {
+      "name": "🌊 Piscina (unidad flotante)",
+      "path": "piscina"
+    },
+    {
+      "name": "📡 Estacion (base)",
+      "path": "estacion"
+    },
+    {
+      "name": "🔗 Shared (protocolo)",
+      "path": "shared"
+    },
+    {
+      "name": "📁 Raíz del repo",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "platformio-ide.activateOnlyOnValidPlatformIOProject": true,
+    "platformio-ide.autoRebuildAutocompleteIndex": true,
+    "files.associations": {
+      "*.ino": "cpp",
+      "*.h": "cpp"
+    },
+    "C_Cpp.default.cppStandard": "c++17",
+    "editor.rulers": [80],
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "search.exclude": {
+      "**/.pio": true,
+      "**/.vscode/.browse*": true
+    },
+    "files.watcherExclude": {
+      "**/.pio/**": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "platformio.platformio-ide",
+      "anthropic.claude-code",
+      "ms-vscode.cpptools"
+    ]
+  }
+}
