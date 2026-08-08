@@ -22,25 +22,36 @@
  *   8, 9, 10, 11   SPI del SX1262 (NSS, SCK, MOSI, MISO)
  *   12, 13, 14     LoRa RST / BUSY / DIO1
  *   17, 18, 21     OLED SSD1306 (SDA, SCL, RST)
- *   19, 20         USB nativo D- / D+  <-- ver nota abajo
  *   26 - 32        Flash SPI del ESP32-S3FN8
  *   35             LED blanco de placa
  *   36             Control de Vext
  *   37             ADC_Ctrl (habilita el divisor de bateria)
  *   39 - 42        JTAG
- *   43, 44         UART0
+ *   43, 44         UART0 -> puente CP2102 -> conector USB
  *
- * NOTA sobre 19/20: el wiki de Heltec los lista como libres, pero esta
- * placa enumera como USB nativo (VID/PID 0x303A:0x1001) y ambos .ini
- * compilan con ARDUINO_USB_CDC_ON_BOOT=1. Por ahi sale Serial y por ahi
- * se flashea: usarlos como GPIO deja la placa sin monitor y sin carga.
+ * CORRECCION sobre 19/20 (comprobado en placa el 2026-08-08):
+ *
+ * Antes ponia aqui que 19/20 llevaban el USB nativo D-/D+ y estaban
+ * ocupados. Era una deduccion a partir de los hwids del archivo de placa de
+ * PlatformIO (0x303A:0x1001), y era FALSA.
+ *
+ * Las dos placas enumeran de verdad como Silicon Labs CP2102
+ * (VID 0x10C4 / PID 0xEA60): el conector USB va al puente CP2102 y el
+ * puente va a UART0, GPIO 43/44. El USB nativo del ESP32-S3 no esta
+ * cableado, asi que 19 y 20 quedan libres.
+ *
+ * De ahi que ambos .ini lleven ARDUINO_USB_CDC_ON_BOOT=0: con el flag a 1,
+ * Serial se mapeaba al USB nativo y no salia nada por el monitor.
  *
  * Los nombres Vext, LED, RST_OLED, SDA_OLED, SCL_OLED, SS, MOSI, MISO y
  * SCK ya los declara pins_arduino.h. No se redefinen aqui.
  *
- * Pines de proposito general realmente libres en esta placa:
- *   2, 4, 5, 6, 7, 47, 48   (siete)
- * Este proyecto los usa TODOS. No queda ninguno de reserva.
+ * Pines de proposito general libres en esta placa:
+ *   2, 4, 5, 6, 7, 47, 48   en uso por este proyecto
+ *   19, 20                  LIBRES, de reserva
+ *
+ * Los 19/20 estan sin asignar a proposito. Confirmar con multimetro
+ * (continuidad contra el conector USB) antes de colgarles nada critico.
  * ================================================================== */
 
 /* ------------------------------------------------------------------

@@ -38,13 +38,33 @@
 #define LORA_CR          5      /* 4/5 */
 #define LORA_TX_DBM      22
 #define LORA_PREAMBLE    8
-#define LORA_SYNC_WORD   0x34   /* privado; 0x34 es el valor por defecto */
+/*
+ * Sync word PRIVADO. Ojo con este valor:
+ *   0x12 = privado          (RADIOLIB_SX126X_SYNC_WORD_PRIVATE, por defecto)
+ *   0x34 = publico, LoRaWAN (RADIOLIB_SX126X_SYNC_WORD_PUBLIC)
+ *
+ * Queremos el privado. Con 0x34 la radio se despertaria con cada trama
+ * LoRaWAN de la zona: el filtro de magic las tiraria igual, pero son
+ * colisiones y consumo regalados en una unidad que va a bateria.
+ */
+#define LORA_SYNC_WORD   0x12
 
 /* Pines SX1262 del Heltec WiFi LoRa 32 V3 — restriccion fija de hardware */
 #define LORA_PIN_CS      8
 #define LORA_PIN_DIO1    14
 #define LORA_PIN_RST     12
 #define LORA_PIN_BUSY    13
+
+/*
+ * Voltaje del TCXO que el SX1262 alimenta por su DIO3.
+ * 1.6 V es el valor por defecto de RadioLib y el que usa la libreria
+ * comunitaria de referencia del Heltec V3 (ropg/heltec_esp32_lora_v3), que
+ * ni siquiera lo pasa. Aqui va explicito para que se vea de donde sale.
+ *
+ * Si begin() devuelve error de SPI o de chip en placa, esto es lo primero
+ * que hay que probar a 1.8: algunas revisiones montan otro TCXO.
+ */
+#define LORA_TCXO_V      1.6f
 
 /* ==================================================================
  *  Cabecera comun
@@ -57,6 +77,7 @@
 enum MsgType : uint8_t {
   MSG_CMD = 1,  /* Estacion  -> Piscina */
   MSG_TLM = 2,  /* Piscina   -> Estacion */
+  MSG_ACK = 3,  /* Piscina   -> Estacion — confirma un CmdPacket con feed=1 */
 };
 
 typedef struct __attribute__((packed)) {
@@ -136,6 +157,45 @@ typedef struct __attribute__((packed)) {
  */
 
 /* ==================================================================
+ *  Confirmacion — Piscina -> Estacion
+ *
+ *  SOLO se confirma la alimentacion. Navegacion y telemetria van sin ACK:
+ *  la navegacion se refresca cuatro veces por ventana de deadman, asi que
+ *  una perdida se corrige sola 500 ms despues, y una muestra de telemetria
+ *  perdida la reemplaza la siguiente.
+ *
+ *  `feed` es la excepcion porque es un flanco, no un estado: si ese paquete
+ *  se pierde, la racion no sale y nadie se entera.
+ * ================================================================== */
+
+enum AckResult : uint8_t {
+  ACK_OK        = 0,  /* ciclo aceptado y arrancado */
+  ACK_BUSY      = 1,  /* ya habia un ciclo en curso; el comando se ignoro */
+  ACK_DUPLICATE = 2,  /* seq ya atendido: es un reintento, NO se re-alimenta */
+};
+
+typedef struct __attribute__((packed)) {
+  MsgHeader hdr;
+  uint16_t  ackSeq;  /* seq del CmdPacket que se confirma */
+  uint8_t   result;  /* AckResult */
+  uint8_t   _pad;    /* alineacion; debe ir en 0 */
+} AckPacket;
+
+/*
+ * REGLA QUE HACE QUE ESTO FUNCIONE — no romperla al implementar:
+ *
+ *   Los reintentos de un comando de alimentacion reusan EL MISMO `seq`.
+ *
+ * Piscina guarda el ultimo seq de alimentacion que atendio. Si le vuelve a
+ * llegar ese seq, NO alimenta otra vez, pero SI reenvia el ACK. Asi el caso
+ * incomodo — la racion ya salio pero el ACK se perdio — acaba en un
+ * ACK_DUPLICATE y no en una doble dosificacion.
+ *
+ * Si los reintentos llevaran seq nuevo, cada uno seria un comando distinto
+ * y el camaron comeria tres veces.
+ */
+
+/* ==================================================================
  *  Tamanos — congelados a proposito
  *  Sin CRC de aplicacion, un desajuste de layout entre las dos placas
  *  no se detecta en vuelo. Estas comprobaciones lo detectan al compilar.
@@ -144,6 +204,13 @@ typedef struct __attribute__((packed)) {
 static_assert(sizeof(MsgHeader) == 6,  "MsgHeader debe medir 6 bytes");
 static_assert(sizeof(CmdPacket) == 10, "CmdPacket debe medir 10 bytes");
 static_assert(sizeof(TlmPacket) == 18, "TlmPacket debe medir 18 bytes");
+static_assert(sizeof(AckPacket) == 10, "AckPacket debe medir 10 bytes");
+
+/*
+ * AckPacket y CmdPacket miden lo mismo, pero no se confunden: viajan en
+ * sentidos opuestos y el campo `type` de la cabecera los separa. Aun asi
+ * protoValidate() exige tipo Y longitud, nunca solo la longitud.
+ */
 
 /* ==================================================================
  *  Temporizacion del enlace
@@ -167,6 +234,33 @@ static_assert(sizeof(TlmPacket) == 18, "TlmPacket debe medir 18 bytes");
  */
 #define NAV_REFRESH_MS   500
 
+/*
+ * Cadencia de telemetria de Piscina.
+ *
+ * Un TlmPacket de 18 B ocupa el aire ~185 ms, asi que a 2 s la telemetria
+ * usa el ~9 % del canal; con la navegacion activa el total ronda el 38 %.
+ *
+ * Nadie coordina las dos radios, de modo que a veces Piscina transmite justo
+ * cuando Estacion manda un comando y ese comando se pierde (~16 % de ellos
+ * durante la navegacion). No es un problema de seguridad: la rafaga dura
+ * 185 ms y los comandos van cada 500 ms, asi que una colision puede tumbar
+ * como mucho UN comando, y el deadman necesita cuatro perdidas seguidas.
+ */
+#define TLM_PERIOD_MS    2000
+
+/*
+ * Ventana de espera del ACK de alimentacion.
+ * Ida 145 ms + vuelta 145 ms + turnaround de la radio y margen.
+ */
+#define FEED_ACK_TIMEOUT_MS   800
+
+/*
+ * Reintentos antes de dar la alimentacion por fallida. Peor caso 4 x 800 ms
+ * = 3.2 s desde el disparo hasta el veredicto.
+ * Recordatorio: los reintentos van con el MISMO seq. Ver la nota de AckPacket.
+ */
+#define FEED_ACK_RETRIES      3
+
 /* ==================================================================
  *  Ayudas de serializacion
  * ================================================================== */
@@ -183,9 +277,18 @@ static inline void protoFillHeader(MsgHeader *hdr, MsgType type, uint16_t seq) {
  * Valida un buffer recibido: comprueba longitud, magic, version y tipo.
  * Devuelve true si el buffer se puede castear al struct correspondiente.
  */
+static inline size_t protoSizeOf(MsgType type) {
+  switch (type) {
+    case MSG_CMD: return sizeof(CmdPacket);
+    case MSG_TLM: return sizeof(TlmPacket);
+    case MSG_ACK: return sizeof(AckPacket);
+  }
+  return 0;
+}
+
 static inline bool protoValidate(const uint8_t *buf, size_t len, MsgType expected) {
-  const size_t want = (expected == MSG_CMD) ? sizeof(CmdPacket) : sizeof(TlmPacket);
-  if (buf == NULL || len != want) {
+  const size_t want = protoSizeOf(expected);
+  if (buf == NULL || want == 0 || len != want) {
     return false;
   }
   MsgHeader hdr;
@@ -196,11 +299,63 @@ static inline bool protoValidate(const uint8_t *buf, size_t len, MsgType expecte
 }
 
 /*
- * Paquetes perdidos entre dos numeros de secuencia consecutivos, con la
- * vuelta de 16 bits ya contemplada. Para el ensayo de alcance de la tesis:
- * el receptor acumula esto y lo saca por serial junto a RSSI y SNR, sin
- * tocar el esquema de Firebase.
+ * Lee el tipo de un buffer recibido sin saber de antemano cual esperabamos.
+ * Hace falta en Estacion, que recibe telemetria y ACK por el mismo camino:
+ * primero mira el tipo con esto, luego valida con protoValidate().
+ *
+ * Devuelve false si el buffer ni siquiera tiene cabecera o si el magic o la
+ * version no cuadran — trafico ajeno o firmware desparejado.
+ */
+static inline bool protoPeekType(const uint8_t *buf, size_t len, MsgType *out) {
+  if (buf == NULL || out == NULL || len < sizeof(MsgHeader)) {
+    return false;
+  }
+  MsgHeader hdr;
+  memcpy(&hdr, buf, sizeof(hdr));
+  if (hdr.magic != PROTO_MAGIC || hdr.version != PROTO_VERSION) {
+    return false;
+  }
+  *out = (MsgType)hdr.type;
+  return protoSizeOf(*out) != 0;
+}
+
+/*
+ * Numero de secuencia de un buffer ya validado. Atajo para no castear el
+ * struct completo cuando solo interesa el seq (contador de perdidas, ACK).
+ */
+static inline uint16_t protoSeq(const uint8_t *buf) {
+  MsgHeader hdr;
+  memcpy(&hdr, buf, sizeof(hdr));
+  return hdr.seq;
+}
+
+/*
+ * Salto maximo que se acepta como perdida real.
+ *
+ * A la cadencia mas rapida del sistema, 1000 paquetes son mas de ocho
+ * minutos de enlace. Un hueco asi no es una rafaga de perdidas: es que el
+ * enlace estuvo caido, y contarlo como paquetes perdidos no mide nada.
+ */
+#define PROTO_SEQ_GAP_MAX   1000
+
+/*
+ * Paquetes perdidos entre dos numeros de secuencia consecutivos.
+ *
+ * La resta se hace en 16 bits, asi que la vuelta del contador sale bien
+ * sola. Lo que NO sale solo es la secuencia yendo hacia atras, y hay dos
+ * formas normales de que eso pase:
+ *
+ *   1. El emisor se reinicia y su contador vuelve a 0.
+ *   2. Un reintento de alimentacion reusa un seq viejo — que es justo lo
+ *      que hacemos a proposito para que Piscina reconozca el duplicado.
+ *
+ * En los dos casos la resta da un numero enorme (65533, 65109...) que
+ * envenena el acumulado. Y este acumulado es un entregable de la tesis: es
+ * el que sostiene las pruebas de alcance. Asi que los saltos imposibles se
+ * descartan devolviendo 0, y el contador sigue siendo utilizable despues de
+ * un reinicio o de un reintento.
  */
 static inline uint16_t protoSeqGap(uint16_t last, uint16_t current) {
-  return (uint16_t)(current - last - 1);
+  const uint16_t gap = (uint16_t)(current - last - 1);
+  return (gap > PROTO_SEQ_GAP_MAX) ? 0 : gap;
 }
