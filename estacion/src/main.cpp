@@ -239,16 +239,16 @@ static void printFirebase() {
   const FbStats *f = firebaseStats();
   const FbCommands *c = firebaseCommands();
   logf("\n--- Firebase -----------------------------------\n"
-       "  stream        %s\n"
-       "  eventos       %lu\n"
-       "  reaperturas   %lu\n"
+       "  lectura       %s\n"
+       "  sondeos ok    %lu\n"
+       "  reconexiones  %lu\n"
        "  errores       %lu\n"
        "  llamadas      %lu   (%lu lentas, >=%d ms)\n"
        "  media         %lu ms\n"
        "  peor llamada  %lu ms   (ya no afecta al enlace LoRa)\n"
        "  telemetria    %lu escritas / %lu fallidas / %lu claves NAN omitidas\n"
        "  comandos: nav=%s  racion=%u g  aspersor=%u/10\n",
-       firebaseReady() ? "abierto" : "cerrado",
+       firebaseReady() ? "OK" : "sin conexion",
        (unsigned long)f->events, (unsigned long)f->reconnects,
        (unsigned long)f->errors, (unsigned long)f->calls,
        (unsigned long)f->slowCalls, FB_SLOW_CALL_MS,
@@ -261,8 +261,12 @@ static void printFirebase() {
   if (f->lastEventMs != 0) {
     logf("  ultimo evento hace %lu ms\n", (unsigned long)(millis() - f->lastEventMs));
   } else {
-    logf("  NINGUN evento recibido todavia\n");
+    logf("  NINGUNA lectura completada todavia\n");
   }
+
+  char dbg[200];
+  firebaseStreamDebug(dbg, sizeof(dbg));
+  logf("  %s\n", dbg);
 
   const char *d = firebaseInitialDump();
   logf("  lectura inicial: %s\n", (d[0] != '\0') ? d : "(sin datos)");

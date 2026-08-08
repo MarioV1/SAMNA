@@ -135,3 +135,6 @@ const char *firebaseLastError();
  * obligar a deducirlo a partir de que los comandos valgan cero.
  */
 const char *firebaseInitialDump();
+
+/* Estado crudo de la conexion del stream, para diagnostico. */
+void firebaseStreamDebug(char *out, size_t n);
