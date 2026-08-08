@@ -129,7 +129,20 @@ static void applyWholeTree(FirebaseJson *json) {
   }
   FirebaseJsonData r;
 
-  if (json->get(r, "motores") && r.typeNum == FirebaseJson::JSON_BOOL && r.boolValue) {
+  /*
+   * Alimentacion en la lectura completa.
+   *
+   * El `!clearPending` NO sobra. Esta funcion corre tambien cada vez que se
+   * reabre el stream, y si el borrado de /motores todavia no ha prosperado,
+   * la clave sigue en true: sin la guarda, cada reapertura dispararia OTRO
+   * ciclo con la misma orden. Es el espejo del fallo del seq — en vez de no
+   * comer, el camaron comeria dos veces.
+   *
+   * Con la guarda, mientras haya un borrado pendiente se entiende que ese
+   * true ya esta atendido.
+   */
+  if (!clearPending &&
+      json->get(r, "motores") && r.typeNum == FirebaseJson::JSON_BOOL && r.boolValue) {
     feedPending  = true;
     clearPending = true;
   }
@@ -177,6 +190,12 @@ bool firebaseBegin() {
    */
   config.timeout.socketConnection = 3000;
   config.timeout.serverResponse   = 3000;
+
+  /* Afecta a los flotantes que la libreria serializa por su cuenta, pero NO
+   * a los que van dentro de un FirebaseJson — comprobado en placa: seguian
+   * saliendo con cinco decimales. De esos se encarga round2() al escribir.
+   * Se deja puesto para los caminos que si cubre. */
+  Firebase.setDoubleDigits(2);
 
   started = true;
   return true;
@@ -386,6 +405,85 @@ void firebasePoll() {
            (type == "int" || type == "float" || type == "double")
              ? (int)fbStream.intData() : 0,
            type == "boolean");
+}
+
+/* ==================================================================
+ *  Telemetria hacia la base
+ * ================================================================== */
+
+/*
+ * Ritmo minimo entre escrituras.
+ *
+ * Piscina manda telemetria cada TLM_PERIOD_MS, asi que en marcha normal esto
+ * no recorta nada. Esta como tope por si algun dia la cadencia sube o llegan
+ * paquetes repetidos: sin el, una racha de telemetria se convertiria en una
+ * racha de escrituras a Firebase, que cuestan cuota y tiempo de red.
+ */
+#define FB_WRITE_MIN_MS   1500
+static uint32_t lastWriteMs = 0;
+
+/*
+ * Redondeo a dos decimales antes de escribir.
+ *
+ * Firebase.setDoubleDigits() no alcanza a los flotantes que van dentro de un
+ * FirebaseJson: sin esto, un 26.98 acaba en la base como 26.97989.
+ *
+ * Y no es solo estetica. El DS18B20 tiene una exactitud de +-0.5 grados;
+ * publicar cinco decimales anuncia una resolucion que el sensor no tiene y
+ * que en una memoria de titulacion es una afirmacion falsa. Dos decimales ya
+ * van sobrados para lo que el sensor puede sostener.
+ */
+static float round2(float v) {
+  return roundf(v * 100.0f) / 100.0f;
+}
+
+bool firebaseWriteTlm(const TlmPacket *tlm) {
+  if (tlm == NULL || !started || !wifiConnected() || !Firebase.ready()) {
+    return false;
+  }
+  if (lastWriteMs != 0 && (millis() - lastWriteMs) < FB_WRITE_MIN_MS) {
+    return false;
+  }
+
+  FirebaseJson json;
+  uint8_t fields = 0;
+
+  if (!isnan(tlm->temperature)) {
+    json.set("temperatura", round2(tlm->temperature));
+    fields++;
+  } else {
+    stats.skippedNan++;
+  }
+
+  if (!isnan(tlm->ph)) {
+    json.set("ph", round2(tlm->ph));
+    fields++;
+  } else {
+    stats.skippedNan++;
+  }
+
+  /* El nivel de sonido es un entero del ADC: no tiene forma de venir en NAN,
+   * asi que siempre se escribe. */
+  json.set("nivelSonido", (int)tlm->soundLevel);
+  fields++;
+
+  if (fields == 0) {
+    return false;   /* todo roto: no se escribe nada */
+  }
+
+  lastWriteMs = millis();
+
+  const uint32_t t0 = callStart();
+  const bool ok = Firebase.updateNode(fbWrite, "/", json);
+  callEnd(t0);
+
+  if (!ok) {
+    setError("no se pudo escribir la telemetria", fbWrite.errorReason().c_str());
+    stats.writeFails++;
+    return false;
+  }
+  stats.writes++;
+  return true;
 }
 
 /* ==================================================================

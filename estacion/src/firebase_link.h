@@ -66,6 +66,33 @@ const FbCommands *firebaseCommands();
 bool firebaseTakeFeed();
 
 /* ------------------------------------------------------------------
+ *  Telemetria hacia la base
+ * ------------------------------------------------------------------ */
+
+/*
+ * Escribe la telemetria en UN SOLO multi-path update sobre la raiz.
+ *
+ *   /temperatura   float
+ *   /ph            float
+ *   /nivelSonido   int
+ *
+ * Una sola escritura y no tres: tres peticiones son tres viajes de red, y
+ * ademas la app podria leer un estado a medias, con la temperatura nueva y
+ * el pH viejo. Con updateNode sobre la raiz solo se tocan estas claves; los
+ * comandos (/motores, /pwm, /aspersor, /nav) no se rozan.
+ *
+ * Las claves cuyo valor venga en NAN se OMITEN. Piscina manda NAN cuando un
+ * sensor no responde, y escribir un cero seria peor que no escribir nada:
+ * la app no distinguiria "el agua esta a 0 grados" de "la sonda esta rota",
+ * y el ultimo valor bueno que quedo en la base es mas util que un cero
+ * inventado.
+ *
+ * Devuelve false si no habia nada que escribir, si no toca todavia por
+ * ritmo, o si la escritura fallo.
+ */
+bool firebaseWriteTlm(const TlmPacket *tlm);
+
+/* ------------------------------------------------------------------
  *  Diagnostico
  * ------------------------------------------------------------------ */
 
@@ -81,6 +108,9 @@ typedef struct {
   uint32_t slowCalls;   /* de esas, cuantas pasaron de FB_SLOW_CALL_MS */
   uint32_t maxCallMs;   /* lo mas que ha tardado una llamada suya */
   uint32_t totalCallMs; /* suma, para sacar la media              */
+  uint32_t writes;      /* telemetrias escritas con exito         */
+  uint32_t writeFails;  /* escrituras que fallaron                */
+  uint32_t skippedNan;  /* claves omitidas por venir en NAN       */
 } FbStats;
 
 const FbStats *firebaseStats();

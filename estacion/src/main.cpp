@@ -233,6 +233,7 @@ static void printFirebase() {
        "  llamadas      %lu   (%lu lentas, >=%d ms)\n"
        "  media         %lu ms\n"
        "  peor llamada  %lu ms   (ya no afecta al enlace LoRa)\n"
+       "  telemetria    %lu escritas / %lu fallidas / %lu claves NAN omitidas\n"
        "  comandos: nav=%s  racion=%u g  aspersor=%u/10\n",
        firebaseReady() ? "abierto" : "cerrado",
        (unsigned long)f->events, (unsigned long)f->reconnects,
@@ -240,6 +241,8 @@ static void printFirebase() {
        (unsigned long)f->slowCalls, FB_SLOW_CALL_MS,
        (unsigned long)(f->calls ? f->totalCallMs / f->calls : 0),
        (unsigned long)f->maxCallMs,
+       (unsigned long)f->writes, (unsigned long)f->writeFails,
+       (unsigned long)f->skippedNan,
        navName(c->nav), c->grams, c->sprayer);
 
   if (f->lastEventMs != 0) {
@@ -443,10 +446,21 @@ static void taskNet(void *arg) {
       }
     }
 
-    /* En el paso 4d, aqui se vaciara qTlm hacia Firebase. */
+    /*
+     * Telemetria hacia la base.
+     *
+     * Se vacia la cola entera y solo se escribe la MAS RECIENTE. Si la red
+     * estuvo lenta y se acumularon tres muestras, escribir las tres seria
+     * gastar tres viajes para dejar en la base exactamente el mismo valor
+     * final. La app quiere el dato de ahora, no el historico.
+     */
     TlmPacket tlm;
+    bool haveTlm = false;
     while (xQueueReceive(qTlm, &tlm, 0) == pdTRUE) {
-      /* de momento se descarta: escribir telemetria es 4d */
+      haveTlm = true;
+    }
+    if (haveTlm) {
+      firebaseWriteTlm(&tlm);
     }
 
     vTaskDelay(pdMS_TO_TICKS(10));
