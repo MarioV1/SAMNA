@@ -92,6 +92,16 @@ bool firebaseTakeFeed();
  */
 bool firebaseWriteTlm(const TlmPacket *tlm);
 
+/*
+ * Enciende o apaga la escritura de telemetria.
+ *
+ * Existe para poder aislar la escritura del stream durante las pruebas: si
+ * el stream deja de caerse con esto apagado, es que las dos conexiones se
+ * estorban. Sin un interruptor habria que reflashear para comprobarlo.
+ */
+void firebaseSetTlmEnabled(bool on);
+bool firebaseTlmEnabled();
+
 /* ------------------------------------------------------------------
  *  Diagnostico
  * ------------------------------------------------------------------ */

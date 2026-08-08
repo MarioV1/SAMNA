@@ -52,6 +52,16 @@ static uint32_t lastTryMs = 0;
 #define FB_STREAM_POLL_MS   100
 static uint32_t lastStreamMs = 0;
 
+/*
+ * Cuanto se aguanta sin una lectura buena antes de dar el stream por muerto
+ * y reabrirlo de verdad. Generoso a proposito: reabrir es caro — cuesta una
+ * relectura completa del arbol — y la libreria casi siempre se recupera
+ * sola mucho antes.
+ */
+#define STREAM_DEAD_MS      30000
+static uint32_t lastGoodStreamMs = 0;
+static uint32_t streamFails      = 0;
+
 static void setError(const char *what, const char *detail) {
   snprintf(lastErr, sizeof(lastErr), "%s: %s", what, detail ? detail : "?");
   stats.errors++;
@@ -181,15 +191,22 @@ bool firebaseBegin() {
   Firebase.reconnectWiFi(false);
 
   /*
-   * Timeouts recortados. Los de fabrica son 10 s tanto para abrir el socket
-   * como para esperar respuesta, y eso convierte una llamada bloqueante en
-   * una parada de diez segundos del bucle entero — cinco veces el deadman.
+   * OJO con serverResponse: NO recortarlo.
    *
-   * Recortarlos no resuelve el problema de fondo, solo acota lo peor que
-   * puede pasar mientras se decide como partir el trabajo.
+   * Cuando todo corria en un solo bucle lo baje a 3 s para acotar el
+   * bloqueo. Efecto medido en placa: el stream se caia y se reabria 38 veces
+   * en pocos minutos, con "not connected" en cada vuelta. Un stream es una
+   * conexion que se queda callada largos ratos esperando cambios, y un
+   * timeout de respuesta corto la interpreta como muerta.
+   *
+   * Ademas cada reapertura relanza la lectura completa del arbol, asi que el
+   * recorte que pretendia ahorrar tiempo acababa gastando mucho mas.
+   *
+   * Tras partir en tareas, el motivo para recortarlo desaparecio: lo que
+   * tarde la red ya no toca al enlace LoRa ni al deadman.
    */
-  config.timeout.socketConnection = 3000;
-  config.timeout.serverResponse   = 3000;
+  config.timeout.socketConnection = 5000;   /* abrir socket si puede fallar rapido */
+  config.timeout.serverResponse   = 10000;  /* el de fabrica; el stream lo necesita */
 
   /* Afecta a los flotantes que la libreria serializa por su cuenta, pero NO
    * a los que van dentro de un FirebaseJson — comprobado en placa: seguian
@@ -266,7 +283,9 @@ static void openStream() {
     streamOpen = false;
     return;
   }
-  streamOpen = true;
+  streamOpen       = true;
+  lastGoodStreamMs = millis();
+  streamFails      = 0;
   stats.reconnects++;
   lastErr[0] = '\0';
 
@@ -352,14 +371,38 @@ void firebasePoll() {
   const bool ok = Firebase.readStream(fbStream);
   callEnd(t0);
 
-  if (!ok) {
-    setError("fallo leyendo el stream", fbStream.errorReason().c_str());
-    streamOpen = false;
+  /*
+   * OJO: que readStream() devuelva false NO significa que el stream este
+   * muerto.
+   *
+   * La libreria reconecta por su cuenta; un false es casi siempre un corte
+   * transitorio del que se recupera sola. La primera version lo trataba como
+   * fatal, cerraba el stream y lo reabria a mano tras 5 s. Efecto medido en
+   * placa: 13 derribos en 75 segundos, cada uno con su relectura completa
+   * del arbol. Es decir, el "arreglo" causaba justo lo que pretendia
+   * arreglar.
+   *
+   * Descartados por experimento antes de llegar aqui: memoria (234 kB
+   * libres), los timeouts, y las escrituras de telemetria — con la
+   * escritura apagada el stream se caia igual, 12 veces en 75 s.
+   *
+   * Ahora solo se reabre de verdad si lleva STREAM_DEAD_MS sin una sola
+   * lectura buena. Mientras tanto, se deja a la libreria recuperarse.
+   */
+  if (ok) {
+    lastGoodStreamMs = millis();
+    streamFails = 0;
+  } else {
+    streamFails++;
+    if ((millis() - lastGoodStreamMs) >= STREAM_DEAD_MS) {
+      setError("el stream lleva demasiado sin responder", fbStream.errorReason().c_str());
+      streamOpen = false;
+    }
     return;
   }
 
   if (fbStream.streamTimeout()) {
-    /* La libreria lo reabre sola, pero se anota: si esto crece mucho, la
+    /* La libreria lo reabre sola; solo se anota. Si esto crece mucho, la
      * cobertura WiFi o el enlace a internet no dan. */
     stats.reconnects++;
     return;
@@ -437,7 +480,20 @@ static float round2(float v) {
   return roundf(v * 100.0f) / 100.0f;
 }
 
+static bool tlmEnabled = true;
+
+void firebaseSetTlmEnabled(bool on) {
+  tlmEnabled = on;
+}
+
+bool firebaseTlmEnabled() {
+  return tlmEnabled;
+}
+
 bool firebaseWriteTlm(const TlmPacket *tlm) {
+  if (!tlmEnabled) {
+    return false;
+  }
   if (tlm == NULL || !started || !wifiConnected() || !Firebase.ready()) {
     return false;
   }

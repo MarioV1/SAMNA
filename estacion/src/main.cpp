@@ -151,6 +151,7 @@ static void printHelp() {
        "  t         tareas y pila libre\n"
        "  p         abrir el portal de configuracion\n"
        "  o         olvidar las redes guardadas\n"
+       "  y         encender/apagar la escritura de telemetria\n"
        "  h         esta ayuda\n"
        "------------------------------------------------\n"
        "Las teclas conviven con Firebase: lo que llegue de la base\n"
@@ -191,8 +192,20 @@ static void printTasks() {
        LOOP_WARN_MS, (unsigned long)loraOverCount);
   logf("  Este es el numero que importa: la tarea LoRa lleva el\n"
        "  refresco de navegacion y el deadman. Lo que tarde la red\n"
-       "  ya no la afecta.\n"
-       "------------------------------------------------\n\n");
+       "  ya no la afecta.\n");
+
+  /*
+   * Memoria. Dos conexiones TLS simultaneas — el stream y la de escritura —
+   * reservan buffers grandes, y si el monton se queda corto la libreria no
+   * avisa con claridad: simplemente se le cae la conexion.
+   */
+  logf("\n  monton libre     %lu B\n"
+       "  minimo historico %lu B   <- si esto baja mucho, el stream se cae por memoria\n"
+       "  bloque mayor     %lu B\n",
+       (unsigned long)ESP.getFreeHeap(),
+       (unsigned long)ESP.getMinFreeHeap(),
+       (unsigned long)ESP.getMaxAllocHeap());
+  logf("------------------------------------------------\n\n");
 }
 
 static void printWifi() {
@@ -514,6 +527,12 @@ static void handleKey(char c) {
     case 'o': case 'O':
       wifiForgetAll();
       logf("[WiFi] redes olvidadas. Aprovisiona desde el portal.\n");
+      break;
+
+    case 'y': case 'Y':
+      firebaseSetTlmEnabled(!firebaseTlmEnabled());
+      logf("[FB] escritura de telemetria %s\n",
+           firebaseTlmEnabled() ? "ENCENDIDA" : "APAGADA (solo para aislar el stream)");
       break;
 
     default: break;
