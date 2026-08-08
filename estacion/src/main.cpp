@@ -68,14 +68,21 @@ static void logf(const char *fmt, ...) {
   if (serialMux == NULL) {
     return;
   }
-  char buf[200];
+  /* 512 y no 200: con 200 los bloques de diagnostico se cortaban a la mitad
+   * y desaparecian justo las lineas del final, que son las que llevan el
+   * ultimo error. Un log que trunca en silencio te esconde lo que buscas. */
+  char buf[512];
   va_list va;
   va_start(va, fmt);
-  vsnprintf(buf, sizeof(buf), fmt, va);
+  const int n = vsnprintf(buf, sizeof(buf), fmt, va);
   va_end(va);
 
   if (xSemaphoreTake(serialMux, pdMS_TO_TICKS(100)) == pdTRUE) {
     Serial.print(buf);
+    /* Si aun asi no cupo, que se vea. Nunca truncar callando. */
+    if (n >= (int)sizeof(buf)) {
+      Serial.printf("...[cortado, faltan %d caracteres]\n", n - (int)sizeof(buf) + 1);
+    }
     xSemaphoreGive(serialMux);
   }
 }
@@ -238,8 +245,12 @@ static void printFirebase() {
   if (f->lastEventMs != 0) {
     logf("  ultimo evento hace %lu ms\n", (unsigned long)(millis() - f->lastEventMs));
   } else {
-    logf("  NINGUN evento recibido todavia: la base puede estar vacia\n");
+    logf("  NINGUN evento recibido todavia\n");
   }
+
+  const char *d = firebaseInitialDump();
+  logf("  lectura inicial: %s\n", (d[0] != '\0') ? d : "(sin datos)");
+
   const char *e = firebaseLastError();
   if (e[0] != '\0') {
     logf("  ultimo error: %s\n", e);

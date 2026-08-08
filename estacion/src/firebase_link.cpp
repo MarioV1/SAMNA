@@ -40,6 +40,10 @@ static bool       clearPending = false;   /* /motores por poner en false */
 static FbStats stats;
 static char    lastErr[128] = "";
 
+/* Volcado crudo de la primera lectura, para poder ver que hay de verdad en
+ * la base en vez de deducirlo. */
+static char    initialDump[256] = "";
+
 /* Reintento de apertura del stream, para no machacar la red si falla. */
 #define FB_RETRY_MS   5000
 static uint32_t lastTryMs = 0;
@@ -192,6 +196,51 @@ bool firebaseBegin() {
  * toda la documentacion de la red. Aqui da "RTDB is private within this
  * context".
  */
+/*
+ * Lectura inicial del arbol completo.
+ *
+ * Hace falta y no es un lujo: un stream solo entrega CAMBIOS. Si las claves
+ * ya estaban escritas antes de que Estacion arrancara — que es el caso
+ * normal, porque la app lleva ahi mas tiempo que la placa — no llega ningun
+ * evento y Estacion se queda creyendo que todo vale cero hasta que alguien
+ * toque el movil.
+ *
+ * Se hace por la conexion de escritura, no por la del stream, para no
+ * interferir con el.
+ */
+static void readInitial() {
+  const uint32_t t0 = millis();
+  const bool ok = Firebase.getJSON(fbWrite, "/");
+  const uint32_t dt = millis() - t0;
+  stats.calls++;
+  stats.totalCallMs += dt;
+  if (dt > stats.maxCallMs) {
+    stats.maxCallMs = dt;
+  }
+
+  if (!ok) {
+    setError("no se pudo leer el estado inicial", fbWrite.errorReason().c_str());
+    return;
+  }
+
+  FirebaseJson *json = fbWrite.jsonObjectPtr();
+  if (json == NULL) {
+    setError("estado inicial vacio o no es un objeto", fbWrite.dataType().c_str());
+    return;
+  }
+
+  /* Se deja el JSON crudo accesible para el diagnostico: si la base no tiene
+   * las claves que esperamos, esto es lo que lo demuestra. */
+  String raw;
+  json->toString(raw, false);
+  strncpy(initialDump, raw.c_str(), sizeof(initialDump) - 1);
+  initialDump[sizeof(initialDump) - 1] = '\0';
+
+  applyWholeTree(json);
+  stats.events++;
+  stats.lastEventMs = millis();
+}
+
 static void openStream() {
   if (!Firebase.beginStream(fbStream, "/")) {
     setError("no se pudo abrir el stream", fbStream.errorReason().c_str());
@@ -201,6 +250,11 @@ static void openStream() {
   streamOpen = true;
   stats.reconnects++;
   lastErr[0] = '\0';
+
+  /* Con el stream ya abierto, se sincroniza el estado actual. En este orden
+   * a proposito: si se leyera antes de abrir, un cambio ocurrido entre la
+   * lectura y la apertura se perderia para siempre. */
+  readInitial();
 }
 
 /* ==================================================================
@@ -360,4 +414,8 @@ const FbStats *firebaseStats() {
 
 const char *firebaseLastError() {
   return lastErr;
+}
+
+const char *firebaseInitialDump() {
+  return initialDump;
 }

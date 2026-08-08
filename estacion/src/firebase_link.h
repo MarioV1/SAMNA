@@ -87,3 +87,11 @@ const FbStats *firebaseStats();
 
 /* Ultimo error en texto, o cadena vacia. */
 const char *firebaseLastError();
+
+/*
+ * JSON crudo de la primera lectura del arbol, recortado.
+ *
+ * Para diagnostico: enseña lo que hay DE VERDAD en la base, en vez de
+ * obligar a deducirlo a partir de que los comandos valgan cero.
+ */
+const char *firebaseInitialDump();
