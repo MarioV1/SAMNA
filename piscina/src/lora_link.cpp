@@ -58,6 +58,7 @@ static bool       rxSeqValid  = false;
 static uint16_t   lastFeedSeq = 0;      /* dedupe de alimentacion */
 static AckResult  lastFeedResult = ACK_OK;
 static bool       feedSeqValid = false;
+static uint32_t   lastFeedMs   = 0;     /* cuando se atendio; acota el dedupe */
 
 static void setError(const char *what, int16_t code) {
   snprintf(lastError, sizeof(lastError), "%s (RadioLib %d)", what, (int)code);
@@ -170,6 +171,7 @@ void linkAckFeed(uint16_t seq, AckResult result) {
   lastFeedSeq    = seq;
   lastFeedResult = result;
   feedSeqValid   = true;
+  lastFeedMs     = millis();
   sendAck(seq, result);
 }
 
@@ -243,12 +245,24 @@ void linkPoll() {
    * reintentar) y BUSY como que no salio. La distincion solo sirve para el
    * log de la tesis.
    *
-   * El resto del comando (nav, pwm) si se entrega: un reintento tambien es
+   * El resto del comando (nav, grams) si se entrega: un reintento tambien es
    * un refresco de navegacion perfectamente valido.
+   *
+   * La comprobacion de tiempo NO es un adorno: sin ella, un reinicio de
+   * Estacion devuelve su contador a 0 y el siguiente comando de alimentacion
+   * se confunde con uno ya atendido. Piscina contestaria "duplicado" sin
+   * dosificar y Estacion lo daria por bueno. Ver FEED_DEDUP_WINDOW_MS.
    */
   if (cmd.feed && feedSeqValid && cmd.hdr.seq == lastFeedSeq) {
-    sendAck(cmd.hdr.seq, lastFeedResult == ACK_OK ? ACK_DUPLICATE : lastFeedResult);
-    cmd.feed = 0;
+    if ((millis() - lastFeedMs) < FEED_DEDUP_WINDOW_MS) {
+      sendAck(cmd.hdr.seq, lastFeedResult == ACK_OK ? ACK_DUPLICATE : lastFeedResult);
+      cmd.feed = 0;
+    } else {
+      /* Fuera de plazo: no puede ser un reintento. Es un comando nuevo que
+       * casualmente reusa el numero, asi que se olvida lo anterior y se
+       * deja pasar. */
+      feedSeqValid = false;
+    }
   }
 
   cmdBox     = cmd;

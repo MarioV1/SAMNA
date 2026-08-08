@@ -26,7 +26,7 @@
 static uint32_t lastTlmMs = 0;
 
 static NavCmd   curNav    = NAV_STOP;
-static uint8_t  curPwm    = 0;
+static uint8_t  curGrams  = 0;   /* masa objetivo del proximo ciclo */
 static bool     navActive = false;
 
 /*
@@ -127,13 +127,11 @@ static bool radioRetry() {
 static void handleCmd(const CmdPacket &cmd) {
   const LinkStats *s = linkStats();
 
-  Serial.printf("[RX cmd  seq=%-5u] nav=%-11s pwm=%3u%%  RSSI %d dBm  SNR %.1f dB\n",
-                cmd.hdr.seq, navName(cmd.nav), cmd.pwm, s->rssi, s->snr);
+  Serial.printf("[RX cmd  seq=%-5u] nav=%-11s racion=%3u g  RSSI %d dBm  SNR %.1f dB\n",
+                cmd.hdr.seq, navName(cmd.nav), cmd.grams, s->rssi, s->snr);
 
-  if (cmd.nav != (uint8_t)curNav || cmd.pwm != curPwm) {
-    curNav = (NavCmd)cmd.nav;
-    curPwm = cmd.pwm;
-  }
+  curNav   = (NavCmd)cmd.nav;
+  curGrams = cmd.grams;
   navActive = (curNav != NAV_STOP);
 
   if (!cmd.feed) {
@@ -154,10 +152,16 @@ static void handleCmd(const CmdPacket &cmd) {
     return;
   }
 
+  /*
+   * Aqui es donde en el paso 6 ira t_on = curGrams / m_punto. De momento la
+   * duracion es fija: m_punto todavia no esta calibrado, y inventarme un
+   * valor haria que el banco pareciera dosificar bien cuando no mide nada.
+   * La racion recibida se imprime para comprobar que llega intacta.
+   */
   dosing      = true;
   doseStartMs = millis();
-  Serial.printf("[FEED seq=%-5u] aceptado: ciclo simulado de %d ms -> ACK_OK\n",
-                cmd.hdr.seq, SIM_DOSE_MS);
+  Serial.printf("[FEED seq=%-5u] aceptado: %u g, ciclo simulado de %d ms -> ACK_OK\n",
+                cmd.hdr.seq, curGrams, SIM_DOSE_MS);
   linkAckFeed(cmd.hdr.seq, ACK_OK);
 }
 

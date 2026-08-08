@@ -42,8 +42,8 @@ static uint16_t   txSeq = 0;
 static uint32_t   lastTxMs = 0;   /* fin de la ultima transmision, de cualquier tipo */
 
 /* Comando vigente: lo que se manda en cada envio, con o sin feed. */
-static NavCmd     curNav = NAV_STOP;
-static uint8_t    curPwm = 0;
+static NavCmd     curNav   = NAV_STOP;
+static uint8_t    curGrams = 0;
 
 /* Telemetria: buzon de un solo hueco. */
 static TlmPacket  tlmBox;
@@ -150,15 +150,15 @@ static bool sendCmd(bool feed, int32_t seq) {
   CmdPacket cmd;
   memset(&cmd, 0, sizeof(cmd));
   protoFillHeader(&cmd.hdr, MSG_CMD, (seq < 0) ? txSeq++ : (uint16_t)seq);
-  cmd.nav  = (uint8_t)curNav;
-  cmd.pwm  = curPwm;
-  cmd.feed = feed ? 1 : 0;
+  cmd.nav   = (uint8_t)curNav;
+  cmd.grams = curGrams;
+  cmd.feed  = feed ? 1 : 0;
   return txPacket(&cmd, sizeof(cmd));
 }
 
-void linkSetNav(NavCmd nav, uint8_t pwm) {
-  curNav = nav;
-  curPwm = (pwm > 100) ? 100 : pwm;
+void linkSetNav(NavCmd nav, uint8_t grams) {
+  curNav   = nav;
+  curGrams = (grams > 100) ? 100 : grams;
 }
 
 bool linkSendCmd() {

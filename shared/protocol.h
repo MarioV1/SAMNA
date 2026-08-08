@@ -114,17 +114,26 @@ enum NavCmd : uint8_t {
 
 typedef struct __attribute__((packed)) {
   MsgHeader hdr;
-  uint8_t   nav;   /* NavCmd */
-  uint8_t   pwm;   /* 0-100 % — velocidad del ASPERSOR unicamente.
-                    * El dosificador no usa PWM: corre siempre al 100 %. */
-  uint8_t   feed;  /* 1 = disparar un ciclo de alimentacion (flanco) */
-  uint8_t   _pad;  /* alineacion; debe ir en 0 */
+  uint8_t   nav;    /* NavCmd */
+  uint8_t   grams;  /* masa objetivo del ciclo, 0-100 g */
+  uint8_t   feed;   /* 1 = disparar un ciclo de alimentacion (flanco) */
+  uint8_t   _pad;   /* alineacion; debe ir en 0 */
 } CmdPacket;
 
 /*
- * La masa objetivo de dosificacion NO viaja en el paquete: el esquema
- * Firebase solo expone /motores y /pwm, asi que M_objetivo es constante
- * de firmware en Piscina y t_on = M_objetivo / m_punto se calcula alli.
+ * Sobre `grams` — ojo con la clave de Firebase de la que sale.
+ *
+ * Llega en `/pwm`, que es un nombre historico: la clave NO transporta un
+ * porcentaje ni gobierna el aspersor. La app Android escribe ahi los gramos
+ * de comida del ciclo (niveles de 60, 70, 80 y 100 g, mas un campo libre con
+ * tope de 100). Comprobado leyendo controlActivity.java el 2026-08-08.
+ *
+ * Asi que la masa objetivo SI viaja en el paquete y Piscina calcula
+ * t_on = grams / m_punto con el valor recibido, en lugar de con una
+ * constante compilada. El tope de 100 g de la app es justo lo que cabe en
+ * este uint8_t.
+ *
+ * El aspersor corre a velocidad fija de firmware: no tiene campo aqui.
  *
  * `feed` es un disparo, no un estado: Piscina ejecuta un ciclo por cada
  * transicion a 1 y lo ignora mientras ya haya un ciclo en curso.
@@ -260,6 +269,28 @@ static_assert(sizeof(AckPacket) == 10, "AckPacket debe medir 10 bytes");
  * Recordatorio: los reintentos van con el MISMO seq. Ver la nota de AckPacket.
  */
 #define FEED_ACK_RETRIES      3
+
+/*
+ * Cuanto tiempo un seq repetido sigue contando como reintento.
+ *
+ * NO sobra, y esto costo una prueba de banco entenderlo. El filtro de
+ * duplicados se apoya en el seq, pero el seq de Estacion vuelve a 0 cuando
+ * Estacion se reinicia. Sin ventana temporal pasa esto:
+ *
+ *   1. Se alimenta con seq=N. Piscina guarda N como atendido.
+ *   2. Estacion se reinicia (microcorte, reset, lo que sea) y su contador
+ *      vuelve a empezar.
+ *   3. El siguiente comando de alimentacion vuelve a llevar seq=N.
+ *   4. Piscina lo toma por un reintento, responde ACK_DUPLICATE y NO dosifica.
+ *   5. Estacion lo da por bueno. El camaron no comio y nadie se entero.
+ *
+ * Reproducido en banco el 2026-08-08.
+ *
+ * Un reintento real nunca puede tardar mas que el ultimo plazo de espera,
+ * asi que se deriva de los propios parametros de reintento en vez de fijar
+ * un numero suelto: si manana cambian, esto se ajusta solo.
+ */
+#define FEED_DEDUP_WINDOW_MS  (FEED_ACK_TIMEOUT_MS * (FEED_ACK_RETRIES + 2))
 
 /* ==================================================================
  *  Ayudas de serializacion

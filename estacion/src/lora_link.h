@@ -49,11 +49,14 @@ void linkPoll();
  * ------------------------------------------------------------------ */
 
 /*
- * Fija la intencion de navegacion y la velocidad del aspersor.
- * `pwm` es 0-100 % y SOLO gobierna el aspersor: el dosificador corre
- * siempre al 100 %. Los valores por encima de 100 se recortan.
+ * Fija la intencion de navegacion y la masa objetivo del proximo ciclo.
+ *
+ * `grams` son gramos de comida, 0-100. Sale de la clave /pwm de Firebase,
+ * que pese al nombre no lleva un porcentaje ni gobierna el aspersor.
+ * Los valores por encima de 100 se recortan, que es tambien el tope que
+ * valida la app.
  */
-void linkSetNav(NavCmd nav, uint8_t pwm);
+void linkSetNav(NavCmd nav, uint8_t grams);
 
 /*
  * Manda el comando vigente con feed=0. Dispara y olvida: la navegacion no
