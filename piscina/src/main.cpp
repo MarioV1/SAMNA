@@ -27,6 +27,7 @@ static uint32_t lastTlmMs = 0;
 
 static NavCmd   curNav    = NAV_STOP;
 static uint8_t  curGrams  = 0;   /* masa objetivo del proximo ciclo */
+static uint8_t  curSprayer = 0;  /* nivel del aspersor, 0-10 — se usa en el paso 6 */
 static bool     navActive = false;
 
 /*
@@ -127,11 +128,16 @@ static bool radioRetry() {
 static void handleCmd(const CmdPacket &cmd) {
   const LinkStats *s = linkStats();
 
-  Serial.printf("[RX cmd  seq=%-5u] nav=%-11s racion=%3u g  RSSI %d dBm  SNR %.1f dB\n",
-                cmd.hdr.seq, navName(cmd.nav), cmd.grams, s->rssi, s->snr);
+  Serial.printf("[RX cmd  seq=%-5u] nav=%-11s racion=%3u g  asp=%2u/10  "
+                "RSSI %d dBm  SNR %.1f dB\n",
+                cmd.hdr.seq, navName(cmd.nav), cmd.grams, cmd.sprayer,
+                s->rssi, s->snr);
 
-  curNav   = (NavCmd)cmd.nav;
-  curGrams = cmd.grams;
+  curNav     = (NavCmd)cmd.nav;
+  curGrams   = cmd.grams;
+  /* El nivel se guarda pero todavia no mueve nada: mapearlo a duty y
+   * arrancar el aspersor es del paso 6. */
+  curSprayer = cmd.sprayer;
   navActive = (curNav != NAV_STOP);
 
   if (!cmd.feed) {

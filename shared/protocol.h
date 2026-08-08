@@ -114,10 +114,10 @@ enum NavCmd : uint8_t {
 
 typedef struct __attribute__((packed)) {
   MsgHeader hdr;
-  uint8_t   nav;    /* NavCmd */
-  uint8_t   grams;  /* masa objetivo del ciclo, 0-100 g */
-  uint8_t   feed;   /* 1 = disparar un ciclo de alimentacion (flanco) */
-  uint8_t   _pad;   /* alineacion; debe ir en 0 */
+  uint8_t   nav;      /* NavCmd */
+  uint8_t   grams;    /* masa objetivo del ciclo, 0-100 g */
+  uint8_t   feed;     /* 1 = disparar un ciclo de alimentacion (flanco) */
+  uint8_t   sprayer;  /* velocidad del aspersor, nivel 0-10 */
 } CmdPacket;
 
 /*
@@ -133,11 +133,25 @@ typedef struct __attribute__((packed)) {
  * constante compilada. El tope de 100 g de la app es justo lo que cabe en
  * este uint8_t.
  *
- * El aspersor corre a velocidad fija de firmware: no tiene campo aqui.
+ * Sobre `sprayer` — nivel 0-10, no porcentaje.
+ *
+ * Llega en la clave `/aspersor` y regula el radio de aspersion, asi que es
+ * control de proceso y no un ajuste cosmetico. Se manda el NIVEL crudo, sin
+ * convertir: la conversion a duty vive en Piscina, que es la unica que sabe
+ * como responde su motor.
+ *
+ * OJO al mapear en el paso 6: no vale nivel * 25.5 desde cero. El JGB37-520
+ * con reductora no arranca por debajo de cierto duty, y el nivel 1 seria un
+ * motor zumbando y quieto. Hay que medir el duty minimo de arranque con
+ * carga y anclar ahi el nivel 1.
+ *
+ * Este campo ocupa el byte que antes era relleno de alineacion, asi que el
+ * paquete sigue midiendo 10 B y el tiempo de aire no cambia.
  *
  * `feed` es un disparo, no un estado: Piscina ejecuta un ciclo por cada
  * transicion a 1 y lo ignora mientras ya haya un ciclo en curso.
  */
+#define SPRAYER_LEVEL_MAX   10
 
 /* ==================================================================
  *  Telemetria — Piscina -> Estacion

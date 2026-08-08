@@ -49,14 +49,15 @@ void linkPoll();
  * ------------------------------------------------------------------ */
 
 /*
- * Fija la intencion de navegacion y la masa objetivo del proximo ciclo.
+ * Fija el comando vigente completo.
  *
- * `grams` son gramos de comida, 0-100. Sale de la clave /pwm de Firebase,
- * que pese al nombre no lleva un porcentaje ni gobierna el aspersor.
- * Los valores por encima de 100 se recortan, que es tambien el tope que
- * valida la app.
+ * `grams`   gramos de comida, 0-100. Sale de la clave /pwm, que pese al
+ *           nombre no lleva un porcentaje ni gobierna el aspersor.
+ * `sprayer` nivel de velocidad del aspersor, 0-10. Sale de /aspersor.
+ *
+ * Ambos se recortan a su rango, que es tambien el que valida la app.
  */
-void linkSetNav(NavCmd nav, uint8_t grams);
+void linkSetNav(NavCmd nav, uint8_t grams, uint8_t sprayer);
 
 /*
  * Manda el comando vigente con feed=0. Dispara y olvida: la navegacion no
