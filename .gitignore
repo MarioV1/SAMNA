@@ -10,9 +10,11 @@
 **/src/secrets.h
 
 # ── VS Code ──────────────────────────────────────────────────
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+# Sin anclar a la raiz: cubre tambien piscina/.vscode y estacion/.vscode,
+# que PlatformIO regenera con rutas absolutas de cada maquina.
+**/.vscode/*
+!**/.vscode/extensions.json
+!**/.vscode/settings.json
 
 # ── Claude Code ──────────────────────────────────────────────
 .claude/settings.local.json
