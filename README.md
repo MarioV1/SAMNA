@@ -57,7 +57,9 @@ Selector de entorno de PlatformIO en la barra inferior → elegir `piscina` o
 
 ## Calibración de dosificación
 
-El control es de lazo abierto: `t_on = M_objetivo / ṁ`.
+El control es de lazo abierto a velocidad fija: `t_on = M_objetivo / ṁ`. El
+sinfín corre siempre al 100 % — la masa se controla con el tiempo, no con la
+velocidad — así que `ṁ` es una sola constante.
 
 Para obtener `ṁ`:
 
@@ -66,8 +68,13 @@ Para obtener `ṁ`:
 3. Repetir 3 veces y promediar.
 4. Escribir el valor en la constante correspondiente del firmware.
 
-Repetir al 50 % y al 30 % para verificar linealidad. Por debajo de ~25 % el
-motor puede calar bajo carga.
+Usar la misma rampa de arranque de ~200 ms que el firmware de producción: los
+gramos que salen durante la rampa entran en el promedio, y calibrar con un
+arranque distinto al de uso mete un sesgo sistemático.
+
+No hace falta repetir al 50 % ni al 30 %. El dosificador no usa velocidades
+intermedias, precisamente porque por debajo de ~25 % el motor cala bajo carga
+y `ṁ` deja de ser repetible.
 
 ---
 
