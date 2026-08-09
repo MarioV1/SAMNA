@@ -86,8 +86,15 @@ bool wifiPortalUp();
 /*
  * Levanta el portal a mano, sin esperar a que falle una ronda.
  * Para el banco, y para reconfigurar sin tener que apagar el router.
+ *
+ * Se cierra solo a los 5 minutos SI hay red. Sin red el plazo no corre,
+ * porque entonces el portal es la unica via de entrada y cerrarlo dejaria
+ * la placa incomunicada.
  */
 void wifiForcePortal();
+
+/* Cierra el portal ahora mismo. */
+void wifiClosePortal();
 
 const char *wifiApIp();
 

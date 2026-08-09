@@ -149,7 +149,7 @@ static void printHelp() {
        "  n         estado del WiFi\n"
        "  b         estado de Firebase\n"
        "  t         tareas y pila libre\n"
-       "  p         abrir el portal de configuracion\n"
+       "  p         abrir / cerrar el portal de configuracion\n"
        "  o         olvidar las redes guardadas\n"
        "  y         encender/apagar la escritura de telemetria\n"
        "  h         esta ayuda\n"
@@ -523,9 +523,17 @@ static void handleKey(char c) {
     case 'h': case 'H': printHelp();     break;
 
     case 'p': case 'P':
-      wifiForcePortal();
-      logf("[WiFi] portal abierto. Conectate a \"%s\" y abre http://%s\n",
-           AP_SSID, wifiApIp());
+      /* Interruptor, no solo encendido: si no, la unica forma de bajar un
+       * portal abierto a mano seria reiniciar la placa. */
+      if (wifiPortalUp()) {
+        wifiClosePortal();
+        logf("[WiFi] portal cerrado.\n");
+      } else {
+        wifiForcePortal();
+        logf("[WiFi] portal abierto. Conectate a \"%s\" y abre http://%s\n"
+             "       Se cerrara solo en 5 min mientras haya red.\n",
+             AP_SSID, wifiApIp());
+      }
       break;
 
     case 'o': case 'O':

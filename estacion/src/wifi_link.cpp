@@ -189,8 +189,46 @@ bool wifiPortalUp() {
   return apUp;
 }
 
+/*
+ * Portal abierto a mano.
+ *
+ * Se distingue del que se abre solo por falta de red, porque ese otro tiene
+ * un final natural: se cierra en cuanto la STA conecta. El forzado no, y si
+ * la STA YA estaba conectada cuando se pulso la tecla, se quedaria emitiendo
+ * para siempre. En una unidad de campo eso es un punto de acceso abierto en
+ * medio de la camaronera que nadie recuerda haber dejado ahi.
+ */
+#define PORTAL_FORCED_MS   (5 * 60 * 1000)
+
+static uint32_t portalForcedMs = 0;
+static bool     portalForced   = false;
+
 void wifiForcePortal() {
+  portalForced   = true;
+  portalForcedMs = millis();
   apStart();
+}
+
+void wifiClosePortal() {
+  portalForced = false;
+  apStop();
+}
+
+/* Cierra el portal forzado cuando vence su plazo. Solo si hay red: sin ella
+ * el portal es la unica via de entrada y cerrarlo dejaria la placa
+ * incomunicada. */
+static void portalTick() {
+  if (!apUp || !portalForced) {
+    return;
+  }
+  if (!wifiConnected()) {
+    portalForcedMs = millis();   /* sin red, el plazo no corre */
+    return;
+  }
+  if ((millis() - portalForcedMs) >= PORTAL_FORCED_MS) {
+    portalForced = false;
+    apStop();
+  }
 }
 
 const char *wifiApIp() {
@@ -319,6 +357,7 @@ bool wifiBegin() {
 
 void wifiPoll() {
   portalPoll();
+  portalTick();
 
   switch (state) {
     case WIFI_ST_IDLE:
