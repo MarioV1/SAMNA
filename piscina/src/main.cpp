@@ -189,7 +189,131 @@ static void handleCmd(const CmdPacket &cmd) {
 }
 
 /* ------------------------------------------------------------------
- *  Telemetria sintetica
+ *  Consola de calibracion
+ *
+ *  Piscina no tenia teclado hasta ahora. Hace falta para el pH: sus
+ *  constantes viven en NVS y se fijan aqui, de modo que recalibrar sea un
+ *  procedimiento de banco y no una edicion de codigo.
+ * ------------------------------------------------------------------ */
+
+static void printPhHelp() {
+  const PhStats *p = sensorPhStats();
+  Serial.println(F("\n--- calibracion de pH ----------------------------"));
+  Serial.printf("  Po = %.3f V   pH = ", p->volts);
+  if (sensorPhOk()) {
+    Serial.printf("%.2f\n", sensorPh());
+  } else {
+    Serial.println(p->calibrated ? "fuera de rango" : "SIN CALIBRAR");
+  }
+  Serial.printf("  modo: %s\n",
+                !p->calibrated ? "sin calibrar"
+                               : (p->twoPoint ? "dos puntos (pendiente medida)"
+                                              : "un punto (pendiente teorica)"));
+  Serial.printf("  pendiente %.2f mV/pH   referencia %.2f pH a %.3f V\n",
+                p->slope, p->offsetPh, p->offsetV);
+  if (p->tempComp) {
+    Serial.printf("  compensado a %.2f C con el DS18B20\n", p->compTempC);
+  }
+  if (p->saturated > 0) {
+    Serial.printf("  AVISO: %lu lecturas pegadas al tope del ADC.\n"
+                  "         Po supera los 3.1 V que admite la entrada:\n"
+                  "         hace falta un divisor entre Po y GPIO %d.\n",
+                  (unsigned long)p->saturated, PIN_PH_ADC);
+  }
+  Serial.println(F("\n  comandos (escribe y pulsa enter):"));
+  Serial.println(F("    c1 <ph>   calibrar con UN punto usando el liquido actual"));
+  Serial.println(F("    ca <ph>   primer punto de una calibracion de dos"));
+  Serial.println(F("    cb <ph>   segundo punto; calcula pendiente y guarda"));
+  Serial.println(F("    cr        borrar la calibracion"));
+  Serial.println(F("    ?         volver a mostrar esto"));
+  Serial.println(F("--------------------------------------------------\n"));
+}
+
+static void handleLine(char *line) {
+  while (*line == ' ') { line++; }
+  if (*line == '\0') {
+    return;
+  }
+
+  if (line[0] == '?') {
+    printPhHelp();
+    return;
+  }
+
+  if (strncmp(line, "cr", 2) == 0) {
+    sensorPhCalReset();
+    Serial.println(F("[pH] calibracion borrada. sensorPh() devuelve NAN."));
+    return;
+  }
+
+  float v = 0.0f;
+  if (strncmp(line, "c1", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
+    const float volts = sensorPhVolts();
+    if (sensorPhCalOnePoint(v)) {
+      Serial.printf("[pH] un punto: %.2f pH a %.3f V. Pendiente teorica.\n"
+                    "     Comprueba ahora con OTRO liquido: si el pH que sale\n"
+                    "     no cuadra con la tira, la ganancia del modulo no es 1\n"
+                    "     y hara falta calibracion de dos puntos.\n", v, volts);
+    } else {
+      Serial.println(F("[pH] valor fuera de 0-14."));
+    }
+    return;
+  }
+
+  if (strncmp(line, "ca", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
+    if (sensorPhCalPointA(v)) {
+      Serial.printf("[pH] primer punto guardado: %.2f pH a %.3f V.\n"
+                    "     Enjuaga la sonda, metela en el segundo liquido,\n"
+                    "     espera a que se estabilice y usa 'cb <ph>'.\n",
+                    v, sensorPhVolts());
+    } else {
+      Serial.println(F("[pH] valor fuera de 0-14."));
+    }
+    return;
+  }
+
+  if (strncmp(line, "cb", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
+    if (sensorPhCalPointB(v)) {
+      const PhStats *p = sensorPhStats();
+      Serial.printf("[pH] dos puntos: pendiente %.2f mV/pH.\n", p->slope);
+      if (fabsf(p->slope) < 40.0f || fabsf(p->slope) > 80.0f) {
+        Serial.println(F("     AVISO: la pendiente se aleja mucho de los -59 mV/pH\n"
+                         "     teoricos. Revisa los patrones o la sonda."));
+      }
+    } else {
+      Serial.println(F("[pH] falta el primer punto ('ca'), el valor esta fuera\n"
+                       "     de 0-14, o los dos patrones estan a menos de 0.5 pH\n"
+                       "     y la pendiente no saldria fiable."));
+    }
+    return;
+  }
+
+  Serial.println(F("[?] no entiendo. Pulsa '?' para ver los comandos."));
+}
+
+static void pollConsole() {
+  static char buf[32];
+  static uint8_t n = 0;
+
+  while (Serial.available() > 0) {
+    const char c = (char)Serial.read();
+    if (c == '\r') {
+      continue;
+    }
+    if (c == '\n') {
+      buf[n] = '\0';
+      handleLine(buf);
+      n = 0;
+      continue;
+    }
+    if (n < sizeof(buf) - 1) {
+      buf[n++] = c;
+    }
+  }
+}
+
+/* ------------------------------------------------------------------
+ *  Telemetria
  * ------------------------------------------------------------------ */
 
 static void sendTelemetry() {
@@ -203,21 +327,20 @@ static void sendTelemetry() {
    * que la app confundiria con agua helada. */
   tlm.temperature = sensorTemperature();
 
-  /*
-   * VALORES FALSOS todavia. El pH es el paso 5b y el ruido el 5c.
-   * Se generan con ondas lentas y de periodo distinto para que en el otro
-   * extremo se vea que cambian de forma continua: si llegaran escalonados o
-   * congelados, el problema estaria en el enlace y no en el sensor.
-   */
-  tlm.ph         = 7.60f + 0.30f * cosf(t / 31.0f);
+  /* pH REAL — paso 5b. NAN mientras no este calibrado: un pH sin calibrar
+   * es un voltaje con unidades inventadas, y publicarlo como medida seria
+   * peor que no publicar nada. */
+  tlm.ph = sensorPh();
+
+  /* VALOR FALSO todavia. El MAX4466 es el paso 5c y aun no ha llegado. */
   tlm.soundLevel = (uint16_t)(400 + 200 * (0.5f + 0.5f * sinf(t / 7.0f)));
 
   tlm.status = 0;
   if (dosing)          { tlm.status |= ST_DOSING; }
   if (navActive)       { tlm.status |= ST_NAV_ACTIVE; }
   if (!sensorTempOk()) { tlm.status |= ST_TEMP_FAULT; }
-  /* ST_ESC_ARMED se queda en 0: no hay ESC hasta el paso 7.
-   * ST_PH_FAULT tampoco, mientras el pH siga siendo sintetico. */
+  if (!sensorPhOk())   { tlm.status |= ST_PH_FAULT; }
+  /* ST_ESC_ARMED se queda en 0: no hay ESC hasta el paso 7. */
 
   const bool ok = linkSendTlm(&tlm);
   const LinkStats *s = linkStats();
@@ -231,8 +354,15 @@ static void sendTelemetry() {
     snprintf(tempTxt, sizeof(tempTxt), "SIN SONDA");
   }
 
-  Serial.printf("[TX tlm  seq=%-5u] %-9s  pH %.2f  ruido %u  estado 0x%02X  %s\n",
-                tlm.hdr.seq, tempTxt, tlm.ph, tlm.soundLevel, tlm.status,
+  char phTxt[24];
+  if (sensorPhOk()) {
+    snprintf(phTxt, sizeof(phTxt), "pH %.2f", tlm.ph);
+  } else {
+    snprintf(phTxt, sizeof(phTxt), "pH s/cal %.2fV", sensorPhVolts());
+  }
+
+  Serial.printf("[TX tlm  seq=%-5u] %-9s  %-14s  ruido %u  estado 0x%02X  %s\n",
+                tlm.hdr.seq, tempTxt, phTxt, tlm.soundLevel, tlm.status,
                 ok ? "ok" : "FALLO");
 
   Serial.printf("          enlace: rx %lu  malos %lu  perdidos %lu  tx %lu/%lu\n",
@@ -279,6 +409,7 @@ void loop() {
 
   linkPoll();
   sensorsPoll();
+  pollConsole();
 
   CmdPacket cmd;
   if (linkTakeCmd(&cmd)) {

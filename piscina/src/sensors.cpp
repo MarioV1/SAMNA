@@ -30,6 +30,7 @@
 
 #include <Arduino.h>
 #include <OneWire.h>
+#include <Preferences.h>
 #include <math.h>
 
 #include "pins.h"
@@ -172,6 +173,172 @@ static bool findProbe() {
 }
 
 /* ==================================================================
+ *  pH — modulo HW-828 sobre PIN_PH_ADC
+ * ================================================================== */
+
+/*
+ * Pendiente teorica de Nernst a 25 grados: 59.16 mV por unidad de pH.
+ *
+ * Negativa porque estas placas entregan MAS tension cuanto MAS acido, que es
+ * lo contrario de lo que hace la sonda desnuda: el modulo invierte.
+ *
+ * Es una SUPOSICION sobre la ganancia del HW-828, que asume unidad. Si al
+ * comprobar con un segundo liquido el pH sale sistematicamente comprimido o
+ * estirado, la ganancia no es 1 y hace falta calibracion de dos puntos con
+ * patrones de verdad. Por eso se guarda siempre la tension cruda.
+ */
+#define PH_SLOPE_NOMINAL_MV   (-59.16f)
+
+/* Cuantas muestras se promedian. El ADC del ESP32-S3 es ruidoso y una sonda
+ * de pH es lenta: promediar sale gratis y quita varias decimas de ruido. */
+#define PH_SAMPLES            64
+#define PH_SAMPLE_PERIOD_MS   500
+
+static Preferences phPrefs;
+static PhStats     ph;
+static uint32_t    lastPhSample = 0;
+
+static void phLoadCal() {
+  phPrefs.begin("ph", false);
+  ph.calibrated = phPrefs.getBool("cal", false);
+  ph.twoPoint   = phPrefs.getBool("two", false);
+  ph.slope      = phPrefs.getFloat("slope", PH_SLOPE_NOMINAL_MV);
+  ph.offsetPh   = phPrefs.getFloat("offPh", 7.0f);
+  ph.offsetV    = phPrefs.getFloat("offV", 2.5f);
+}
+
+static void phStoreCal() {
+  phPrefs.putBool("cal", ph.calibrated);
+  phPrefs.putBool("two", ph.twoPoint);
+  phPrefs.putFloat("slope", ph.slope);
+  phPrefs.putFloat("offPh", ph.offsetPh);
+  phPrefs.putFloat("offV", ph.offsetV);
+}
+
+static void phSample() {
+  uint32_t acc = 0;
+  for (uint16_t i = 0; i < PH_SAMPLES; i++) {
+    acc += analogReadMilliVolts(PIN_PH_ADC);
+  }
+  const float mv = (float)acc / PH_SAMPLES;
+  ph.volts = mv / 1000.0f;
+  ph.reads++;
+
+  /*
+   * Con 11 dB de atenuacion el ADC del ESP32-S3 mide hasta unos 3.1 V. Si la
+   * lectura se pega ahi, la señal esta recortada y el pH que salga seria
+   * mentira: hace falta un divisor entre Po y el GPIO.
+   */
+  if (ph.volts >= 3.05f) {
+    ph.saturated++;
+  }
+}
+
+float sensorPhVolts() {
+  return ph.volts;
+}
+
+float sensorPh() {
+  if (!ph.calibrated) {
+    return NAN;
+  }
+  if (ph.volts >= 3.05f) {
+    return NAN;   /* señal recortada: no se inventa un valor */
+  }
+
+  /*
+   * Compensacion por temperatura.
+   *
+   * La pendiente de Nernst escala con la temperatura ABSOLUTA: a 30 grados
+   * es un 1.7 % mayor que a 25. Casi ningun montaje casero lo corrige, pero
+   * aqui el DS18B20 esta justo al lado y el dato sale gratis.
+   *
+   * Solo se aplica cuando la pendiente es la teorica. Si se midio con dos
+   * patrones, ya lleva dentro la temperatura a la que se calibro y
+   * corregirla otra vez seria contarla dos veces.
+   */
+  float slope = ph.slope;
+  ph.tempComp = false;
+  if (!ph.twoPoint && sensorTempOk()) {
+    const float tC = sensorTemperature();
+    ph.compTempC = tC;
+    ph.tempComp  = true;
+    slope = PH_SLOPE_NOMINAL_MV * ((tC + 273.15f) / 298.15f);
+  }
+
+  const float mvDiff = (ph.volts - ph.offsetV) * 1000.0f;
+  const float value  = ph.offsetPh + (mvDiff / slope);
+
+  /* Rango fisico. Fuera de 0-14 la lectura no es pH, es un fallo. */
+  if (value < 0.0f || value > 14.0f) {
+    return NAN;
+  }
+  return value;
+}
+
+bool sensorPhOk() {
+  return !isnan(sensorPh());
+}
+
+bool sensorPhCalOnePoint(float knownPh) {
+  if (knownPh < 0.0f || knownPh > 14.0f) {
+    return false;
+  }
+  ph.offsetV    = ph.volts;
+  ph.offsetPh   = knownPh;
+  ph.slope      = PH_SLOPE_NOMINAL_MV;
+  ph.twoPoint   = false;
+  ph.calibrated = true;
+  ph.pendingA   = false;
+  phStoreCal();
+  return true;
+}
+
+bool sensorPhCalPointA(float knownPh) {
+  if (knownPh < 0.0f || knownPh > 14.0f) {
+    return false;
+  }
+  ph.pendingAV  = ph.volts;
+  ph.pendingAPh = knownPh;
+  ph.pendingA   = true;
+  return true;
+}
+
+bool sensorPhCalPointB(float knownPh) {
+  if (!ph.pendingA || knownPh < 0.0f || knownPh > 14.0f) {
+    return false;
+  }
+  const float dPh = knownPh - ph.pendingAPh;
+  if (fabsf(dPh) < 0.5f) {
+    /* Dos patrones casi iguales dan una pendiente sin sentido. Mejor
+     * rechazarlo que guardar una calibracion que parece buena y no lo es. */
+    return false;
+  }
+  ph.slope      = ((ph.volts - ph.pendingAV) * 1000.0f) / dPh;
+  ph.offsetV    = ph.volts;
+  ph.offsetPh   = knownPh;
+  ph.twoPoint   = true;
+  ph.calibrated = true;
+  ph.pendingA   = false;
+  phStoreCal();
+  return true;
+}
+
+void sensorPhCalReset() {
+  ph.calibrated = false;
+  ph.twoPoint   = false;
+  ph.slope      = PH_SLOPE_NOMINAL_MV;
+  ph.offsetPh   = 7.0f;
+  ph.offsetV    = 2.5f;
+  ph.pendingA   = false;
+  phStoreCal();
+}
+
+const PhStats *sensorPhStats() {
+  return &ph;
+}
+
+/* ==================================================================
  *  API
  * ================================================================== */
 
@@ -179,10 +346,21 @@ void sensorsBegin() {
   memset(&stats, 0, sizeof(stats));
   lastTemp = NAN;
   state = findProbe() ? T_IDLE : T_ABSENT;
+
+  memset(&ph, 0, sizeof(ph));
+  /* 11 dB: fondo de escala ~3.1 V, que es lo mas que admite la entrada. */
+  analogSetPinAttenuation(PIN_PH_ADC, ADC_11db);
+  phLoadCal();
+  phSample();
 }
 
 void sensorsPoll() {
   const uint32_t now = millis();
+
+  if ((now - lastPhSample) >= PH_SAMPLE_PERIOD_MS) {
+    lastPhSample = now;
+    phSample();
+  }
 
   switch (state) {
     case T_ABSENT:

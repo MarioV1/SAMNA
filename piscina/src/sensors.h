@@ -45,6 +45,70 @@ float sensorTemperature();
 bool sensorTempOk();
 
 /* ------------------------------------------------------------------
+ *  pH — sonda sobre modulo HW-828 (familia PH-4502C)
+ * ------------------------------------------------------------------ */
+
+/*
+ * pH actual, o NAN si todavia no se ha calibrado.
+ *
+ * Sin calibrar se devuelve NAN a proposito, no un numero aproximado: un pH
+ * sin calibrar es un voltaje con unidades inventadas, y publicarlo como si
+ * fuera una medida es peor que no publicar nada. Estacion omitira la clave.
+ */
+float sensorPh();
+bool  sensorPhOk();
+
+/* Tension cruda en la salida Po, en voltios. SIEMPRE disponible, calibrado
+ * o no: es el dato con el que se puede recalcular el pH a posteriori. */
+float sensorPhVolts();
+
+/* ------------------------------------------------------------------
+ *  Calibracion del pH
+ *
+ *  Las constantes viven en NVS, no compiladas. Recalibrar es un
+ *  procedimiento de banco, no una edicion de codigo — y cuando lleguen
+ *  buffers de verdad se rehace en dos minutos sin recompilar.
+ * ------------------------------------------------------------------ */
+
+/*
+ * Calibracion de UN punto: fija el desplazamiento usando la pendiente
+ * teorica de Nernst.
+ *
+ * Cuando los dos liquidos disponibles tienen pH parecido, esto es MAS
+ * exacto que una calibracion de dos puntos. Con dos puntos separados solo
+ * 1.2 unidades y +-0.5 de incertidumbre cada uno, el error de la pendiente
+ * pasa del 40 %; la pendiente teorica no tiene ese error porque no se
+ * estima, se conoce.
+ */
+bool sensorPhCalOnePoint(float knownPh);
+
+/* Calibracion de DOS puntos: mide pendiente y desplazamiento. Solo merece
+ * la pena con patrones separados y fiables — buffers de 4.00 y 7.00. */
+bool sensorPhCalPointA(float knownPh);
+bool sensorPhCalPointB(float knownPh);
+
+/* Borra la calibracion. sensorPh() vuelve a devolver NAN. */
+void sensorPhCalReset();
+
+typedef struct {
+  bool     calibrated;
+  bool     twoPoint;     /* true si la pendiente se midio, false si es teorica */
+  float    volts;        /* ultima tension leida en Po                */
+  float    slope;        /* mV por unidad de pH (negativa)            */
+  float    offsetPh;     /* pH en el punto de referencia              */
+  float    offsetV;      /* tension en ese punto                      */
+  float    compTempC;    /* temperatura usada para compensar          */
+  bool     tempComp;     /* true si se compenso con el DS18B20        */
+  bool     pendingA;     /* hay un primer punto capturado             */
+  float    pendingAV;
+  float    pendingAPh;
+  uint32_t reads;
+  uint32_t saturated;    /* lecturas pegadas al tope del ADC          */
+} PhStats;
+
+const PhStats *sensorPhStats();
+
+/* ------------------------------------------------------------------
  *  Diagnostico — para el banco y para la memoria de la tesis
  * ------------------------------------------------------------------ */
 
