@@ -18,6 +18,8 @@
 #include <Arduino.h>
 
 #include "lora_link.h"
+#include "pins.h"
+#include "sensors.h"
 
 /* ------------------------------------------------------------------
  *  Estado del banco
@@ -86,6 +88,21 @@ void setup() {
   if (radioReady) {
     Serial.println(F("Radio lista. Escuchando comandos.\n"));
   }
+
+  sensorsBegin();
+  {
+    const TempStats *ts = sensorTempStats();
+    if (ts->present) {
+      Serial.printf("DS18B20 encontrado en GPIO %d, direccion %s, %d bits\n\n",
+                    PIN_ONEWIRE, ts->addr, 11);
+    } else {
+      Serial.printf("DS18B20 NO encontrado en GPIO %d.\n"
+                    "  Comprueba la pull-up de 4.7k entre datos y 3V3, y que\n"
+                    "  VCC y GND no esten invertidos (la sonda se calienta).\n"
+                    "  Se reintenta cada 10 s.\n\n", PIN_ONEWIRE);
+    }
+  }
+
   lastTlmMs = millis();
 }
 
@@ -179,34 +196,75 @@ static void sendTelemetry() {
   TlmPacket tlm;
   memset(&tlm, 0, sizeof(tlm));
 
-  /*
-   * VALORES FALSOS. Los sensores reales entran en el paso 5. Se generan con
-   * ondas lentas y de periodo distinto para que en el otro extremo se vea
-   * que cambian de forma continua: si llegaran escalonados o congelados,
-   * el problema estaria en el enlace y no en el sensor.
-   */
   const float t = millis() / 1000.0f;
-  tlm.temperature = 26.0f + 2.0f * sinf(t / 20.0f);
-  tlm.ph          = 7.60f + 0.30f * cosf(t / 31.0f);
-  tlm.soundLevel  = (uint16_t)(400 + 200 * (0.5f + 0.5f * sinf(t / 7.0f)));
+
+  /* Temperatura REAL — DS18B20, paso 5a. NAN si la sonda no responde, y
+   * entonces Estacion omite la clave en Firebase en vez de escribir un cero
+   * que la app confundiria con agua helada. */
+  tlm.temperature = sensorTemperature();
+
+  /*
+   * VALORES FALSOS todavia. El pH es el paso 5b y el ruido el 5c.
+   * Se generan con ondas lentas y de periodo distinto para que en el otro
+   * extremo se vea que cambian de forma continua: si llegaran escalonados o
+   * congelados, el problema estaria en el enlace y no en el sensor.
+   */
+  tlm.ph         = 7.60f + 0.30f * cosf(t / 31.0f);
+  tlm.soundLevel = (uint16_t)(400 + 200 * (0.5f + 0.5f * sinf(t / 7.0f)));
 
   tlm.status = 0;
-  if (dosing)    { tlm.status |= ST_DOSING; }
-  if (navActive) { tlm.status |= ST_NAV_ACTIVE; }
+  if (dosing)          { tlm.status |= ST_DOSING; }
+  if (navActive)       { tlm.status |= ST_NAV_ACTIVE; }
+  if (!sensorTempOk()) { tlm.status |= ST_TEMP_FAULT; }
   /* ST_ESC_ARMED se queda en 0: no hay ESC hasta el paso 7.
-   * ST_TEMP_FAULT y ST_PH_FAULT tampoco, no hay sensores que fallen. */
+   * ST_PH_FAULT tampoco, mientras el pH siga siendo sintetico. */
 
   const bool ok = linkSendTlm(&tlm);
   const LinkStats *s = linkStats();
 
-  Serial.printf("[TX tlm  seq=%-5u] %.2f C  pH %.2f  ruido %u  estado 0x%02X  %s\n",
-                tlm.hdr.seq, tlm.temperature, tlm.ph, tlm.soundLevel, tlm.status,
+  /* La temperatura se imprime aparte porque NAN no se ve bien con %.2f y
+   * hay que poder distinguir "sin sonda" de un numero cualquiera. */
+  char tempTxt[16];
+  if (sensorTempOk()) {
+    snprintf(tempTxt, sizeof(tempTxt), "%.2f C", tlm.temperature);
+  } else {
+    snprintf(tempTxt, sizeof(tempTxt), "SIN SONDA");
+  }
+
+  Serial.printf("[TX tlm  seq=%-5u] %-9s  pH %.2f  ruido %u  estado 0x%02X  %s\n",
+                tlm.hdr.seq, tempTxt, tlm.ph, tlm.soundLevel, tlm.status,
                 ok ? "ok" : "FALLO");
 
   Serial.printf("          enlace: rx %lu  malos %lu  perdidos %lu  tx %lu/%lu\n",
                 (unsigned long)s->rxOk, (unsigned long)s->rxBad,
                 (unsigned long)s->lost,
                 (unsigned long)s->txOk, (unsigned long)(s->txOk + s->txFail));
+
+  const TempStats *ts = sensorTempStats();
+  if (ts->present) {
+    Serial.printf("          DS18B20: presente  lecturas %lu  fallos %lu"
+                  " (CRC malo %lu, valor 85.00 %lu)  conversion %lu ms\n",
+                  (unsigned long)ts->reads, (unsigned long)ts->faults,
+                  (unsigned long)ts->crcFails, (unsigned long)ts->resetValues,
+                  (unsigned long)ts->convMs);
+  } else {
+    /* Sin sonda, lo util no es el contador de lecturas sino lo que se ve en
+     * el bus: cada combinacion apunta a una causa distinta. */
+    const char *hint;
+    if (!ts->lineHigh) {
+      hint = "falta la pull-up de 4k7 a 3V3, o el amarillo no esta en GPIO7";
+    } else if (!ts->presence) {
+      hint = "pull-up OK pero nadie contesta: revisa rojo/negro del sensor";
+    } else {
+      hint = "contesta pero el scratchpad no valida: ruido en la linea";
+    }
+    Serial.printf("          DS18B20 AUSENTE  linea=%s  presencia=%s  ROM %s (CRC %s)\n"
+                  "          -> %s\n",
+                  ts->lineHigh ? "ALTA" : "BAJA",
+                  ts->presence ? "SI" : "NO",
+                  ts->addr, ts->romCrcOk ? "ok" : "malo",
+                  hint);
+  }
 }
 
 /* ------------------------------------------------------------------
@@ -220,6 +278,7 @@ void loop() {
   }
 
   linkPoll();
+  sensorsPoll();
 
   CmdPacket cmd;
   if (linkTakeCmd(&cmd)) {
