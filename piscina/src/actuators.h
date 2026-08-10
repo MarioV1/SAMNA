@@ -130,21 +130,69 @@ bool actuatorsCalSetRate(float gramsPerSec);
 void actuatorsCalReset();
 
 /* ------------------------------------------------------------------
- *  Aspersor: duty minimo de arranque
+ *  Aspersor: duty minimo UTIL
  *
- *  Un motor con reductora no arranca por debajo de cierto duty. Sin medirlo,
- *  el nivel 1 seria un motor zumbando y quieto, y el usuario pensaria que el
- *  aspersor esta roto. El nivel 1 se ancla justo por encima de ese minimo.
+ *  Hay dos umbrales distintos y el que importa NO es el evidente:
+ *
+ *    minimo mecanico  por debajo el eje no se mueve. Medido en banco: por
+ *                     debajo de 40/255. Es el que se busca por instinto y
+ *                     es el equivocado.
+ *
+ *    minimo UTIL      por debajo el disco gira pero no lanza la comida lo
+ *                     bastante lejos para servir de nada. Medido con el
+ *                     disco montado: 102/255, el 40 % de duty, que lanza a
+ *                     ~1 m.
+ *
+ *  El nivel 1 se ancla en el UTIL. Anclarlo en el mecanico desperdiciaria
+ *  los tres primeros niveles en velocidades que giran sin esparcir.
  * ------------------------------------------------------------------ */
 
 void    actuatorsSetSprayerMinDuty(uint8_t duty);
 uint8_t actuatorsSprayerMinDuty();
 uint8_t actuatorsDutyForLevel(uint8_t level);
 
+/*
+ * Radio de aspersion estimado, en metros, para un duty dado.
+ *
+ * Medido en banco por Mario el 2026-08-10: al 40 % de duty el disco lanza a
+ * ~1 m, y cada 10 % adicional suma ~2 m. Es lo que convierte los niveles de
+ * numeros arbitrarios en una magnitud fisica.
+ *
+ * OJO con el modelo: es LINEAL porque asi se observo, pero el alcance de un
+ * proyectil crece con el CUADRADO de la velocidad de salida. Si la
+ * observacion se hizo con dos o tres puntos, lo mas probable es que la
+ * relacion real sea algo superlineal y que los radios de los niveles altos
+ * esten subestimados. Conviene comprobar un par de niveles en campo con
+ * comida de verdad antes de dar los metros por buenos en la memoria.
+ */
+float actuatorsRadiusForDuty(uint8_t duty);
+
 /* Barrido de duty para encontrar el minimo a ojo: sube despacio e informa.
  * Se corta solo, y cualquier otra cosa lo cancela. */
 bool actuatorsCalSweepSprayer();
 bool actuatorsSweeping();
+
+/*
+ * Duty actual del barrido. Hay que publicarlo: sin verlo por serial no hay
+ * forma de saber en que valor estaba el motor cuando empezo a girar, que es
+ * justo el dato que el barrido existe para obtener.
+ */
+uint8_t actuatorsSweepDuty();
+
+/*
+ * Fija un duty crudo en el aspersor y lo mantiene ahi.
+ *
+ * Para hallar el minimo de arranque a base de preguntas: se pone un valor,
+ * se mira si el eje gira, y se converge. El barrido automatico no sirve
+ * cuando quien mira el motor y quien lee el serial no son la misma persona
+ * — un puerto solo lo puede abrir un proceso a la vez.
+ *
+ * ARRANCA DESDE PARADO cada vez: pone 0 un instante antes. Es lo que hace
+ * que la medida sea la buena, porque el duty que hace falta para arrancar es
+ * mayor que el que basta para seguir girando, y el caso real es siempre
+ * partir de parado.
+ */
+bool actuatorsSetSprayerRaw(uint8_t duty);
 
 /* Para todo AHORA. Para el banco y para emergencias. */
 void actuatorsStopAll();

@@ -277,7 +277,8 @@ static void printPhHelp() {
   Serial.println(F("    am <g/s>  fijar m_punto a mano (si se midio fuera)"));
   Serial.println(F("    arr       borrar m_punto"));
   Serial.println(F("\n  aspersor:"));
-  Serial.println(F("    sw        barrido de duty para hallar el minimo de arranque"));
+  Serial.println(F("    sd <duty> fijar un duty crudo y mantenerlo (0-255)"));
+  Serial.println(F("    sw        barrido automatico de duty"));
   Serial.println(F("    sm <duty> guardar ese minimo (0-255)"));
   Serial.println(F("    sl <0-10> probar un nivel"));
   Serial.println(F("\n    x         PARAR TODO"));
@@ -421,15 +422,33 @@ static void handleLine(char *line) {
   }
 
   int n = 0;
+  if (strncmp(line, "sd", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
+    if (n < 0 || n > 255) {
+      Serial.println(F("[ACT] duty fuera de 0-255."));
+      return;
+    }
+    if (actuatorsSetSprayerRaw((uint8_t)n)) {
+      Serial.printf("[ACT] aspersor a duty %d (%d %%), arrancando desde parado.\n"
+                    "      Mira el EJE: gira o solo zumba?\n", n, n * 100 / 255);
+    } else {
+      Serial.println(F("[ACT] no se pudo: hay un ciclo en marcha."));
+    }
+    return;
+  }
+
   if (strncmp(line, "sm", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
     if (n < 0 || n > 255) {
       Serial.println(F("[ACT] duty fuera de 0-255."));
       return;
     }
     actuatorsSetSprayerMinDuty((uint8_t)n);
-    Serial.printf("[ACT] duty minimo de arranque = %d.\n"
-                  "      Ahora el nivel 1 da duty %u y el nivel 10 da %u.\n",
-                  n, actuatorsDutyForLevel(1), actuatorsDutyForLevel(10));
+    Serial.printf("[ACT] duty minimo util = %d (%d %%).\n"
+                  "      Mapa de niveles a radio estimado:\n", n, n * 100 / 255);
+    for (uint8_t lv = 1; lv <= SPRAYER_LEVEL_MAX; lv++) {
+      const uint8_t d = actuatorsDutyForLevel(lv);
+      Serial.printf("        nivel %2u -> duty %3u (%3d %%) -> ~%.1f m\n",
+                    lv, d, d * 100 / 255, actuatorsRadiusForDuty(d));
+    }
     return;
   }
 
@@ -571,6 +590,31 @@ void loop() {
   CmdPacket cmd;
   if (linkTakeCmd(&cmd)) {
     handleCmd(cmd);
+  }
+
+  /*
+   * Barrido del aspersor: se imprime cada escalon.
+   *
+   * Sin esto el barrido sube el duty en silencio y no habria forma de saber
+   * en que valor estaba el motor cuando arranco — que es exactamente el dato
+   * que el barrido existe para obtener.
+   */
+  {
+    static uint8_t lastSweep = 0;
+    static bool    wasSweeping = false;
+    const bool sweeping = actuatorsSweeping();
+
+    if (sweeping) {
+      const uint8_t d = actuatorsSweepDuty();
+      if (d != lastSweep) {
+        lastSweep = d;
+        Serial.printf("[SW] duty %3u / 255   (%2u %%)\n", d, (unsigned)(d * 100 / 255));
+      }
+    } else if (wasSweeping) {
+      Serial.println(F("[SW] barrido terminado. Guarda el minimo con 'sm <duty>'."));
+      lastSweep = 0;
+    }
+    wasSweeping = sweeping;
   }
 
   /* Avisa una sola vez cuando el ciclo real termina. */

@@ -376,6 +376,25 @@ uint8_t actuatorsSprayerMinDuty() {
   return sprayMin;
 }
 
+/*
+ * Modelo de alcance, medido en banco el 2026-08-10.
+ *   40 % de duty  ->  1 m
+ *   +10 % de duty -> +2 m
+ * Ver la advertencia sobre la linealidad en actuators.h.
+ */
+#define RADIUS_REF_PCT      40.0f
+#define RADIUS_REF_M        1.0f
+#define RADIUS_M_PER_PCT    0.2f
+
+float actuatorsRadiusForDuty(uint8_t duty) {
+  if (duty == 0) {
+    return 0.0f;
+  }
+  const float pct = (duty * 100.0f) / FEED_PWM_MAX;
+  const float r   = RADIUS_REF_M + (pct - RADIUS_REF_PCT) * RADIUS_M_PER_PCT;
+  return (r < 0.0f) ? 0.0f : r;
+}
+
 bool actuatorsCalSweepSprayer() {
   if (actuatorsBusy()) {
     return false;
@@ -389,6 +408,28 @@ bool actuatorsCalSweepSprayer() {
 
 bool actuatorsSweeping() {
   return sweeping;
+}
+
+uint8_t actuatorsSweepDuty() {
+  return sweepDuty;
+}
+
+bool actuatorsSetSprayerRaw(uint8_t duty) {
+  if (state != DOSE_IDLE || calRun) {
+    return false;
+  }
+  sweeping = false;
+
+  /*
+   * Se pasa por cero antes de aplicar el valor. Sin esto, subir de 90 a 95
+   * con el motor YA girando mediria el duty de mantenimiento, que es menor
+   * que el de arranque — y el nivel 1 quedaria por debajo de lo que hace
+   * falta para partir de parado, que es el caso real.
+   */
+  sprayerWrite(0);
+  delay(300);
+  sprayerWrite(duty);
+  return true;
 }
 
 const ActStats *actuatorsStats() {
