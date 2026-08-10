@@ -69,6 +69,8 @@ static bool online  = false;   /* ultima lectura buena */
 static FbCommands cmds  = { NAV_STOP, 0, 0, false };
 static bool       feedPending  = false;   /* flanco sin consumir     */
 static bool       clearPending = false;   /* /motores por poner en false */
+static bool       stopPending      = false;   /* flanco de /paro sin consumir */
+static bool       clearStopPending = false;   /* /paro por poner en false     */
 
 static FbStats stats;
 static char    lastErr[128] = "";
@@ -135,6 +137,15 @@ static void applyTree(FirebaseJson *json) {
       json->get(r, "motores") && r.typeNum == FirebaseJson::JSON_BOOL && r.boolValue) {
     feedPending  = true;
     clearPending = true;
+  }
+
+  /* PARO. Misma guarda que /motores y por la misma razon: mientras su
+   * borrado no haya prosperado, la clave sigue en true y cada vuelta
+   * volveria a dispararlo. */
+  if (!clearStopPending &&
+      json->get(r, "paro") && r.typeNum == FirebaseJson::JSON_BOOL && r.boolValue) {
+    stopPending      = true;
+    clearStopPending = true;
   }
 
   if (json->get(r, "pwm")) {
@@ -238,6 +249,16 @@ void firebasePoll() {
       clearPending = false;
     } else {
       setError("no se pudo borrar /motores", fbWrite.errorReason().c_str());
+    }
+    callEnd(t0);
+  }
+
+  if (clearStopPending) {
+    const uint32_t t0 = callStart();
+    if (Firebase.setBool(fbWrite, "/paro", false)) {
+      clearStopPending = false;
+    } else {
+      setError("no se pudo borrar /paro", fbWrite.errorReason().c_str());
     }
     callEnd(t0);
   }
@@ -380,6 +401,14 @@ bool firebaseTakeFeed() {
     return false;
   }
   feedPending = false;
+  return true;
+}
+
+bool firebaseTakeStop() {
+  if (!stopPending) {
+    return false;
+  }
+  stopPending = false;
   return true;
 }
 

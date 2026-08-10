@@ -220,6 +220,35 @@ uint8_t actuatorsSprayerLevel() {
   return sprayLevel;
 }
 
+float actuatorsAbort() {
+  if (state == DOSE_IDLE && !calRun && !sweeping) {
+    return -1.0f;
+  }
+
+  float delivered = 0.0f;
+  if (state == DOSE_RUNNING) {
+    /*
+     * Estimacion de lo que salio: el tiempo que el sinfin estuvo girando,
+     * menos el deficit de la rampa, por el caudal. Es lo mismo que hace
+     * actuatorsStartDose() a la inversa.
+     */
+    const uint32_t ran = millis() - augerStart;
+    if (ran > RAMP_DEFICIT_MS && rateGps > 0.0f) {
+      delivered = rateGps * ((ran - RAMP_DEFICIT_MS) / 1000.0f);
+    }
+    stats.lastOnMs  = ran;
+    stats.lastGrams = delivered;
+    stats.aborted++;
+  }
+
+  augerWrite(0);
+  sprayerWrite(0);
+  state    = DOSE_IDLE;
+  calRun   = false;
+  sweeping = false;
+  return delivered;
+}
+
 void actuatorsStopAll() {
   augerWrite(0);
   sprayerWrite(0);

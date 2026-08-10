@@ -112,11 +112,34 @@ enum NavCmd : uint8_t {
   NAV_CCW     = 4,  /* Firebase: /nav/aho      — giro antihorario */
 };
 
+/*
+ * Ordenes de alimentacion. Van en el campo `feed`, que es un uint8_t del que
+ * antes solo se usaban dos valores: cabe un tercero sin agrandar el paquete.
+ */
+enum FeedCmd : uint8_t {
+  FEED_NONE  = 0,   /* nada que hacer                                    */
+  FEED_START = 1,   /* disparar un ciclo (flanco)                        */
+  /*
+   * Abortar el ciclo en curso AHORA. Viene del boton de PARO de la app.
+   *
+   * Es distinto de que se caiga el enlace, y por eso hace falta un codigo
+   * propio. Si el enlace se cae nadie ha pedido parar — simplemente no
+   * oimos — y terminar el ciclo da una masa conocida en vez de una parcial
+   * desconocida. Pero si alguien pulsa PARO esta pidiendo explicitamente
+   * que pare, probablemente mirando la maquina. Un paro que no para es un
+   * fallo.
+   *
+   * NO lleva ACK: es idempotente — abortar algo ya parado no hace nada —
+   * asi que se manda repetido y la repeticion sustituye a la confirmacion.
+   */
+  FEED_ABORT = 2,
+};
+
 typedef struct __attribute__((packed)) {
   MsgHeader hdr;
   uint8_t   nav;      /* NavCmd */
   uint8_t   grams;    /* masa objetivo del ciclo, 0-100 g */
-  uint8_t   feed;     /* 1 = disparar un ciclo de alimentacion (flanco) */
+  uint8_t   feed;     /* FeedCmd */
   uint8_t   sprayer;  /* velocidad del aspersor, nivel 0-10 */
 } CmdPacket;
 

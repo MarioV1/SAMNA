@@ -164,7 +164,22 @@ static void handleCmd(const CmdPacket &cmd) {
   actuatorsSetSprayerLevel(curSprayer);
   navActive = (curNav != NAV_STOP);
 
-  if (!cmd.feed) {
+  /*
+   * PARO expreso. Va antes que cualquier otra cosa y no lleva ACK: es
+   * idempotente y llega repetido, asi que la repeticion sustituye a la
+   * confirmacion.
+   */
+  if (cmd.feed == FEED_ABORT) {
+    const float got = actuatorsAbort();
+    if (got >= 0.0f) {
+      Serial.printf("[PARO] ciclo abortado. Salieron ~%.0f g de los %u pedidos.\n"
+                    "       Es una ESTIMACION por tiempo, no una medida.\n",
+                    got, curGrams);
+    }
+    return;
+  }
+
+  if (cmd.feed != FEED_START) {
     return;
   }
 

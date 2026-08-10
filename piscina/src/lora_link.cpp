@@ -253,10 +253,15 @@ void linkPoll() {
    * se confunde con uno ya atendido. Piscina contestaria "duplicado" sin
    * dosificar y Estacion lo daria por bueno. Ver FEED_DEDUP_WINDOW_MS.
    */
-  if (cmd.feed && feedSeqValid && cmd.hdr.seq == lastFeedSeq) {
+  /*
+   * El dedupe solo aplica a FEED_START. Un FEED_ABORT nunca se filtra:
+   * es idempotente y llega repetido a proposito, asi que tratarlo como
+   * duplicado seria tragarse justo el paro que alguien esta pidiendo.
+   */
+  if (cmd.feed == FEED_START && feedSeqValid && cmd.hdr.seq == lastFeedSeq) {
     if ((millis() - lastFeedMs) < FEED_DEDUP_WINDOW_MS) {
       sendAck(cmd.hdr.seq, lastFeedResult == ACK_OK ? ACK_DUPLICATE : lastFeedResult);
-      cmd.feed = 0;
+      cmd.feed = FEED_NONE;
     } else {
       /* Fuera de plazo: no puede ser un reintento. Es un comando nuevo que
        * casualmente reusa el numero, asi que se olvida lo anterior y se

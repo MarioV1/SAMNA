@@ -65,6 +65,17 @@ const FbCommands *firebaseCommands();
  */
 bool firebaseTakeFeed();
 
+/*
+ * true una sola vez por cada flanco de /paro. Consumirlo tambien lanza el
+ * borrado de la clave, igual que /motores.
+ *
+ * Existe como clave propia y no se deduce de /motores puesto a false porque
+ * Estacion pone /motores a false ella misma en cuanto lo lee: ese false es
+ * indistinguible del que escribiria la app al pulsar PARO. Sin una clave
+ * aparte, el paro es invisible para Piscina.
+ */
+bool firebaseTakeStop();
+
 /* ------------------------------------------------------------------
  *  Telemetria hacia la base
  * ------------------------------------------------------------------ */

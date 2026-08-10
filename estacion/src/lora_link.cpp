@@ -147,15 +147,36 @@ static bool txPacket(const void *buf, size_t len) {
  * los reintentos de alimentacion conservan su numero de secuencia mientras
  * refrescan la navegacion.
  */
-static bool sendCmd(bool feed, int32_t seq) {
+static bool sendCmd(uint8_t feedCode, int32_t seq) {
   CmdPacket cmd;
   memset(&cmd, 0, sizeof(cmd));
   protoFillHeader(&cmd.hdr, MSG_CMD, (seq < 0) ? txSeq++ : (uint16_t)seq);
   cmd.nav     = (uint8_t)curNav;
   cmd.grams   = curGrams;
-  cmd.feed    = feed ? 1 : 0;
+  cmd.feed    = feedCode;
   cmd.sprayer = curSprayer;
   return txPacket(&cmd, sizeof(cmd));
+}
+
+/*
+ * PARO. Se manda repetido y sin ACK.
+ *
+ * Abortar es idempotente — cortar algo ya parado no hace nada — asi que la
+ * repeticion sustituye a la confirmacion, y sale mas barato que montar una
+ * transaccion con reintentos para un mensaje que no puede hacer daño de mas.
+ *
+ * Tres envios son ~435 ms de aire. Es mucho para el canal, y esta bien
+ * gastado: el refresco de navegacion son 500 ms y el deadman 2000, asi que
+ * ni siquiera roza el margen de seguridad.
+ */
+bool linkSendAbort() {
+  bool any = false;
+  for (uint8_t i = 0; i < 3; i++) {
+    if (sendCmd(FEED_ABORT, -1)) {
+      any = true;
+    }
+  }
+  return any;
 }
 
 void linkSetNav(NavCmd nav, uint8_t grams, uint8_t sprayer) {
@@ -165,7 +186,7 @@ void linkSetNav(NavCmd nav, uint8_t grams, uint8_t sprayer) {
 }
 
 bool linkSendCmd() {
-  return sendCmd(false, -1);
+  return sendCmd(FEED_NONE, -1);
 }
 
 /* ==================================================================
@@ -182,7 +203,7 @@ bool linkStartFeed() {
   feedSentMs  = millis();
   feedState   = FEED_PENDING;
 
-  if (!sendCmd(true, (int32_t)feedSeq)) {
+  if (!sendCmd(FEED_START, (int32_t)feedSeq)) {
     /* No se pudo ni transmitir. Se deja PENDING igualmente: linkPoll()
      * reintentara al vencer el plazo, que es mejor que rendirse al primer
      * fallo de radio. Se devuelve false para que quien llama lo sepa. */
@@ -228,7 +249,7 @@ static void feedTick() {
   feedTries++;
   feedSentMs = millis();
   stats.feedRetries++;
-  sendCmd(true, (int32_t)feedSeq);   /* mismo seq, navegacion fresca */
+  sendCmd(FEED_START, (int32_t)feedSeq);   /* mismo seq, navegacion fresca */
 }
 
 /* ==================================================================

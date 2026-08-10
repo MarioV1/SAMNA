@@ -68,6 +68,19 @@ void linkSetNav(NavCmd nav, uint8_t grams, uint8_t sprayer);
  */
 bool linkSendCmd();
 
+/*
+ * PARO: manda FEED_ABORT tres veces seguidas, sin ACK.
+ *
+ * Sin confirmacion a proposito: abortar es idempotente — cortar algo ya
+ * parado no hace nada — asi que la repeticion sustituye a la confirmacion.
+ * Montar una transaccion con reintentos para un mensaje que no puede hacer
+ * daño de mas seria complicarlo sin ganar nada.
+ *
+ * Bloquea ~435 ms de aire. Bien gastados: el refresco de navegacion son
+ * 500 ms y el deadman 2000, asi que ni roza el margen de seguridad.
+ */
+bool linkSendAbort();
+
 /* ------------------------------------------------------------------
  *  Alimentacion, con confirmacion
  * ------------------------------------------------------------------ */

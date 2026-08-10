@@ -197,6 +197,18 @@ bool actuatorsSetSprayerRaw(uint8_t duty);
 /* Para todo AHORA. Para el banco y para emergencias. */
 void actuatorsStopAll();
 
+/*
+ * Aborta el ciclo en curso por orden expresa (boton de PARO).
+ *
+ * Devuelve los gramos que se habian dosificado hasta el momento del corte,
+ * estimados a partir del tiempo transcurrido. Es una ESTIMACION, no una
+ * medida — pero decir "salieron unos 23 g" es mucho mas util que decir
+ * "se aborto" y dejar la masa en el aire.
+ *
+ * Devuelve -1 si no habia nada que abortar.
+ */
+float actuatorsAbort();
+
 /* ------------------------------------------------------------------
  *  Diagnostico
  * ------------------------------------------------------------------ */
@@ -204,6 +216,7 @@ void actuatorsStopAll();
 typedef struct {
   uint32_t cycles;        /* ciclos completados            */
   uint32_t rejected;      /* ciclos rechazados             */
+  uint32_t aborted;       /* ciclos cortados por PARO      */
   uint32_t guardTrips;    /* veces que salto MAX_DOSE_MS   */
   uint32_t lastOnMs;      /* duracion del ultimo t_on      */
   float    lastGrams;     /* masa del ultimo ciclo         */

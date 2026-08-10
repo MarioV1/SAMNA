@@ -347,13 +347,24 @@ static void taskLora(void *arg) {
     /* Comandos que llegan de la red o de la consola. */
     NetCmd c;
     while (xQueueReceive(qCmd, &c, 0) == pdTRUE) {
+      /*
+       * El PARO se atiende ANTES de tocar nada mas y sin pasar por el resto
+       * del flujo: es lo unico de esta cola que alguien puede estar pidiendo
+       * con la maquina delante.
+       */
+      if (c.feed == FEED_ABORT) {
+        linkSendAbort();
+        logf("[PARO] abortar enviado (3 veces, sin ACK)\n");
+        continue;
+      }
+
       curNav     = (NavCmd)c.nav;
       curGrams   = c.grams;
       curSprayer = c.sprayer;
       linkSetNav(curNav, curGrams, curSprayer);
       linkSendCmd();
 
-      if (c.feed) {
+      if (c.feed == FEED_START) {
         if (linkFeedState() == FEED_PENDING) {
           logf("[FEED] ignorado: ya hay una alimentacion esperando ACK\n");
         } else {
@@ -439,6 +450,19 @@ static void taskNet(void *arg) {
                        : "[FB] stream cerrado\n");
     }
 
+    /*
+     * PARO: se mira antes que cualquier otra cosa y se manda solo, sin
+     * esperar a que cambien nav ni gramos.
+     */
+    if (firebaseTakeStop()) {
+      NetCmd stop = { (uint8_t)NAV_STOP, 0, 0, (uint8_t)FEED_ABORT };
+      if (xQueueSend(qCmd, &stop, 0) != pdTRUE) {
+        logf("[PARO] cola llena; el paro NO salio\n");
+      } else {
+        logf("[PARO] recibido de Firebase, encolado\n");
+      }
+    }
+
     if (firebaseReady()) {
       const FbCommands *c = firebaseCommands();
       const bool changed = !fbEverApplied ||
@@ -453,7 +477,7 @@ static void taskNet(void *arg) {
         fbLastSprayer = c->sprayer;
         fbEverApplied = true;
 
-        NetCmd out = { (uint8_t)c->nav, c->grams, c->sprayer, feed ? (uint8_t)1 : (uint8_t)0 };
+        NetCmd out = { (uint8_t)c->nav, c->grams, c->sprayer, feed ? (uint8_t)FEED_START : (uint8_t)FEED_NONE };
         if (xQueueSend(qCmd, &out, 0) != pdTRUE) {
           logf("[FB] cola de comandos llena; se descarta\n");
         } else {
@@ -491,7 +515,7 @@ static void taskNet(void *arg) {
 /* Publica el estado de consola por la misma cola que usa la red, para que la
  * radio siga teniendo un unico dueño. */
 static void pushCmd(bool feed) {
-  NetCmd out = { (uint8_t)curNav, curGrams, curSprayer, feed ? (uint8_t)1 : (uint8_t)0 };
+  NetCmd out = { (uint8_t)curNav, curGrams, curSprayer, feed ? (uint8_t)FEED_START : (uint8_t)FEED_NONE };
   xQueueSend(qCmd, &out, 0);
   logf("[TX cmd] nav=%s racion=%u g aspersor=%u/10%s\n",
        navName(curNav), curGrams, curSprayer, feed ? "  + ALIMENTAR" : "");
