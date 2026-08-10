@@ -17,6 +17,7 @@
 
 #include <Arduino.h>
 
+#include "actuators.h"
 #include "lora_link.h"
 #include "pins.h"
 #include "sensors.h"
@@ -32,16 +33,8 @@ static uint8_t  curGrams  = 0;   /* masa objetivo del proximo ciclo */
 static uint8_t  curSprayer = 0;  /* nivel del aspersor, 0-10 — se usa en el paso 6 */
 static bool     navActive = false;
 
-/*
- * Dosificacion simulada. En el firmware real este tiempo saldra de
- * t_on = M_objetivo / m_punto (paso 6); aqui es un valor fijo y generoso
- * para que de tiempo a pulsar 'f' dos veces seguidas en el banco de Estacion
- * y ver la respuesta ACK_BUSY.
- */
-#define SIM_DOSE_MS   5000
-
-static bool     dosing      = false;
-static uint32_t doseStartMs = 0;
+/* La dosificacion ya no se simula: la lleva actuators.{h,cpp} con motores
+ * de verdad. Ver la secuencia del ciclo en actuators.h. */
 
 /* Estado de la radio, para poder reintentar sin colgar la placa. */
 static bool     radioReady     = false;
@@ -87,6 +80,21 @@ void setup() {
   radioReady = linkBegin();
   if (radioReady) {
     Serial.println(F("Radio lista. Escuchando comandos.\n"));
+  }
+
+  /*
+   * Los actuadores ANTES que los sensores: lo primero que tiene que pasar
+   * tras el reset es que los dos RPWM queden en nivel bajo. Cada
+   * milisegundo que pasan flotando es un milisegundo en que un BTS7960 con
+   * los EN en alto podria estar moviendo un motor.
+   */
+  actuatorsBegin();
+  Serial.printf("Actuadores: sinfin GPIO %d, aspersor GPIO %d, ambos a 0.\n",
+                PIN_FEEDER_RPWM, PIN_SPRAYER_RPWM);
+  if (!actuatorsCalibrated()) {
+    Serial.println(F("m_punto SIN CALIBRAR: la alimentacion se rechazara."));
+  } else {
+    Serial.printf("m_punto = %.3f g/s\n", actuatorsRate());
   }
 
   sensorsBegin();
@@ -152,9 +160,8 @@ static void handleCmd(const CmdPacket &cmd) {
 
   curNav     = (NavCmd)cmd.nav;
   curGrams   = cmd.grams;
-  /* El nivel se guarda pero todavia no mueve nada: mapearlo a duty y
-   * arrancar el aspersor es del paso 6. */
   curSprayer = cmd.sprayer;
+  actuatorsSetSprayerLevel(curSprayer);
   navActive = (curNav != NAV_STOP);
 
   if (!cmd.feed) {
@@ -162,30 +169,51 @@ static void handleCmd(const CmdPacket &cmd) {
   }
 
   /*
-   * Alimentacion. Si ya hay un ciclo en curso se rechaza: la masa se
+   * Alimentacion real. Si ya hay un ciclo en curso se rechaza: la masa se
    * controla con el tiempo, asi que solapar dos ciclos daria una racion
    * imposible de calcular.
    *
    * Los reintentos con seq repetido no llegan hasta aqui — el enlace los
    * filtra y responde por su cuenta.
    */
-  if (dosing) {
-    Serial.printf("[FEED seq=%-5u] rechazado: ciclo en curso -> ACK_BUSY\n", cmd.hdr.seq);
-    linkAckFeed(cmd.hdr.seq, ACK_BUSY);
-    return;
-  }
+  const DoseResult r = actuatorsStartDose(curGrams);
 
-  /*
-   * Aqui es donde en el paso 6 ira t_on = curGrams / m_punto. De momento la
-   * duracion es fija: m_punto todavia no esta calibrado, y inventarme un
-   * valor haria que el banco pareciera dosificar bien cuando no mide nada.
-   * La racion recibida se imprime para comprobar que llega intacta.
-   */
-  dosing      = true;
-  doseStartMs = millis();
-  Serial.printf("[FEED seq=%-5u] aceptado: %u g, ciclo simulado de %d ms -> ACK_OK\n",
-                cmd.hdr.seq, curGrams, SIM_DOSE_MS);
-  linkAckFeed(cmd.hdr.seq, ACK_OK);
+  switch (r) {
+    case DOSE_ACCEPTED:
+      Serial.printf("[FEED seq=%-5u] aceptado: %u g -> %lu ms de sinfin, "
+                    "aspersor %u/10 -> ACK_OK\n",
+                    cmd.hdr.seq, curGrams,
+                    (unsigned long)(curGrams / actuatorsRate() * 1000.0f),
+                    curSprayer);
+      linkAckFeed(cmd.hdr.seq, ACK_OK);
+      break;
+
+    case DOSE_ERR_BUSY:
+      Serial.printf("[FEED seq=%-5u] rechazado: ciclo en curso -> ACK_BUSY\n",
+                    cmd.hdr.seq);
+      linkAckFeed(cmd.hdr.seq, ACK_BUSY);
+      break;
+
+    case DOSE_ERR_NOCAL:
+      Serial.printf("[FEED seq=%-5u] RECHAZADO: m_punto sin calibrar.\n"
+                    "                 Calibra con 'ar'/'ag' antes de dosificar.\n",
+                    cmd.hdr.seq);
+      linkAckFeed(cmd.hdr.seq, ACK_REJECTED);
+      break;
+
+    case DOSE_ERR_TOOLONG:
+      Serial.printf("[FEED seq=%-5u] RECHAZADO: %u g exigirian mas de %d ms.\n"
+                    "                 Se rechaza en vez de recortar: una racion\n"
+                    "                 corta informando de exito seria peor.\n",
+                    cmd.hdr.seq, curGrams, MAX_DOSE_MS);
+      linkAckFeed(cmd.hdr.seq, ACK_REJECTED);
+      break;
+
+    case DOSE_ERR_ZERO:
+      Serial.printf("[FEED seq=%-5u] RECHAZADO: 0 gramos.\n", cmd.hdr.seq);
+      linkAckFeed(cmd.hdr.seq, ACK_REJECTED);
+      break;
+  }
 }
 
 /* ------------------------------------------------------------------
@@ -221,11 +249,39 @@ static void printPhHelp() {
                   "         hace falta un divisor entre Po y GPIO %d.\n",
                   (unsigned long)p->saturated, PIN_PH_ADC);
   }
-  Serial.println(F("\n  comandos (escribe y pulsa enter):"));
+  Serial.println(F("\n  pH:"));
   Serial.println(F("    c1 <ph>   calibrar con UN punto usando el liquido actual"));
   Serial.println(F("    ca <ph>   primer punto de una calibracion de dos"));
   Serial.println(F("    cb <ph>   segundo punto; calcula pendiente y guarda"));
-  Serial.println(F("    cr        borrar la calibracion"));
+  Serial.println(F("    cr        borrar la calibracion de pH"));
+
+  const ActStats *as = actuatorsStats();
+  Serial.println(F("\n--- actuadores -----------------------------------"));
+  if (actuatorsCalibrated()) {
+    Serial.printf("  m_punto = %.3f g/s   (100 g -> %.1f s de sinfin)\n",
+                  actuatorsRate(), 100.0f / actuatorsRate());
+  } else {
+    Serial.println(F("  m_punto SIN CALIBRAR. La alimentacion se rechaza"));
+    Serial.println(F("  con ACK_REJECTED hasta que se mida."));
+  }
+  Serial.printf("  aspersor: nivel %u/10, duty minimo de arranque %u/255\n",
+                actuatorsSprayerLevel(), actuatorsSprayerMinDuty());
+  Serial.printf("  duty actual: sinfin %u  aspersor %u\n",
+                as->augerDuty, as->sprayerDuty);
+  Serial.printf("  ciclos %lu   rechazados %lu   guarda MAX_DOSE %lu\n",
+                (unsigned long)as->cycles, (unsigned long)as->rejected,
+                (unsigned long)as->guardTrips);
+
+  Serial.println(F("\n  calibracion del sinfin (m_punto):"));
+  Serial.println(F("    ar <ms>   correr el sinfin ese tiempo, con la rampa real"));
+  Serial.println(F("    ag <g>    decirle cuanto peso lo que salio -> calcula m_punto"));
+  Serial.println(F("    am <g/s>  fijar m_punto a mano (si se midio fuera)"));
+  Serial.println(F("    arr       borrar m_punto"));
+  Serial.println(F("\n  aspersor:"));
+  Serial.println(F("    sw        barrido de duty para hallar el minimo de arranque"));
+  Serial.println(F("    sm <duty> guardar ese minimo (0-255)"));
+  Serial.println(F("    sl <0-10> probar un nivel"));
+  Serial.println(F("\n    x         PARAR TODO"));
   Serial.println(F("    ?         volver a mostrar esto"));
   Serial.println(F("--------------------------------------------------\n"));
 }
@@ -299,6 +355,96 @@ static void handleLine(char *line) {
     return;
   }
 
+  /* --- actuadores --- */
+
+  if (line[0] == 'x' || line[0] == 'X') {
+    actuatorsStopAll();
+    Serial.println(F("[ACT] TODO PARADO."));
+    return;
+  }
+
+  if (strncmp(line, "arr", 3) == 0) {
+    actuatorsCalReset();
+    Serial.println(F("[ACT] m_punto borrado. La alimentacion se rechazara."));
+    return;
+  }
+
+  unsigned long ms = 0;
+  if (strncmp(line, "ar", 2) == 0 && sscanf(line + 2, "%lu", &ms) == 1) {
+    if (actuatorsCalRunAuger(ms)) {
+      Serial.printf("[ACT] sinfin %lu ms con la rampa de produccion.\n"
+                    "      Pesa lo que salga y dime cuanto con 'ag <gramos>'.\n",
+                    (unsigned long)ms);
+    } else {
+      Serial.println(F("[ACT] no se pudo: hay algo en marcha, o el tiempo\n"
+                       "      es 0 o pasa de MAX_DOSE_MS."));
+    }
+    return;
+  }
+
+  if (strncmp(line, "ag", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
+    if (actuatorsCalSetGrams(v)) {
+      Serial.printf("[ACT] m_punto = %.3f g/s.\n"
+                    "      Un ciclo de 100 g durara %.1f s.\n"
+                    "      Comprueba pidiendo una racion y volviendo a pesar.\n",
+                    actuatorsRate(), 100.0f / actuatorsRate());
+    } else {
+      Serial.println(F("[ACT] no se pudo: peso invalido, o todavia no has\n"
+                       "      corrido el sinfin con 'ar <ms>'."));
+    }
+    return;
+  }
+
+  if (strncmp(line, "am", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
+    if (actuatorsCalSetRate(v)) {
+      Serial.printf("[ACT] m_punto = %.3f g/s (caudal a plena marcha).\n"
+                    "      60 g -> %.2f s   100 g -> %.2f s\n"
+                    "      (incluye +%d ms de compensacion de rampa)\n",
+                    actuatorsRate(),
+                    60.0f / v + (FEEDER_RAMP_MS / 2) / 1000.0f,
+                    100.0f / v + (FEEDER_RAMP_MS / 2) / 1000.0f,
+                    FEEDER_RAMP_MS / 2);
+    } else {
+      Serial.println(F("[ACT] valor fuera de rango."));
+    }
+    return;
+  }
+
+  if (strncmp(line, "sw", 2) == 0) {
+    if (actuatorsCalSweepSprayer()) {
+      Serial.println(F("[ACT] barrido del aspersor: el duty sube 5 cada 400 ms.\n"
+                       "      MIRA el motor y anota el duty al que EMPIEZA a girar.\n"
+                       "      Luego guardalo con 'sm <duty>'. 'x' para cortar."));
+    } else {
+      Serial.println(F("[ACT] no se pudo: hay algo en marcha."));
+    }
+    return;
+  }
+
+  int n = 0;
+  if (strncmp(line, "sm", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
+    if (n < 0 || n > 255) {
+      Serial.println(F("[ACT] duty fuera de 0-255."));
+      return;
+    }
+    actuatorsSetSprayerMinDuty((uint8_t)n);
+    Serial.printf("[ACT] duty minimo de arranque = %d.\n"
+                  "      Ahora el nivel 1 da duty %u y el nivel 10 da %u.\n",
+                  n, actuatorsDutyForLevel(1), actuatorsDutyForLevel(10));
+    return;
+  }
+
+  if (strncmp(line, "sl", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
+    if (n < 0 || n > SPRAYER_LEVEL_MAX) {
+      Serial.printf("[ACT] nivel fuera de 0-%d.\n", SPRAYER_LEVEL_MAX);
+      return;
+    }
+    actuatorsSetSprayerLevel((uint8_t)n);
+    Serial.printf("[ACT] nivel %d -> duty %u. Se aplica en el proximo ciclo.\n",
+                  n, actuatorsDutyForLevel((uint8_t)n));
+    return;
+  }
+
   Serial.println(F("[?] no entiendo. Pulsa '?' para ver los comandos."));
 }
 
@@ -347,7 +493,7 @@ static void sendTelemetry() {
   tlm.soundLevel = (uint16_t)(400 + 200 * (0.5f + 0.5f * sinf(t / 7.0f)));
 
   tlm.status = 0;
-  if (dosing)          { tlm.status |= ST_DOSING; }
+  if (actuatorsBusy()) { tlm.status |= ST_DOSING; }
   if (navActive)       { tlm.status |= ST_NAV_ACTIVE; }
   if (!sensorTempOk()) { tlm.status |= ST_TEMP_FAULT; }
   if (!sensorPhOk())   { tlm.status |= ST_PH_FAULT; }
@@ -420,6 +566,7 @@ void loop() {
 
   linkPoll();
   sensorsPoll();
+  actuatorsPoll();
   pollConsole();
 
   CmdPacket cmd;
@@ -427,10 +574,16 @@ void loop() {
     handleCmd(cmd);
   }
 
-  /* Fin del ciclo de alimentacion simulado. */
-  if (dosing && (millis() - doseStartMs) >= SIM_DOSE_MS) {
-    dosing = false;
-    Serial.println(F("[FEED] ciclo simulado terminado"));
+  /* Avisa una sola vez cuando el ciclo real termina. */
+  {
+    static DoseState prev = DOSE_IDLE;
+    const DoseState now = actuatorsDoseState();
+    if (prev != DOSE_IDLE && now == DOSE_IDLE) {
+      const ActStats *as = actuatorsStats();
+      Serial.printf("[FEED] ciclo terminado: %.0f g en %lu ms de sinfin\n",
+                    as->lastGrams, (unsigned long)as->lastOnMs);
+    }
+    prev = now;
   }
 
   /*

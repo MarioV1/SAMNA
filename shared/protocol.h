@@ -195,6 +195,16 @@ enum AckResult : uint8_t {
   ACK_OK        = 0,  /* ciclo aceptado y arrancado */
   ACK_BUSY      = 1,  /* ya habia un ciclo en curso; el comando se ignoro */
   ACK_DUPLICATE = 2,  /* seq ya atendido: es un reintento, NO se re-alimenta */
+  /*
+   * No se puede dosificar: sin calibrar, o el tiempo calculado excede la
+   * guarda de seguridad.
+   *
+   * Es distinto de ACK_BUSY y hace falta que lo sea. "Estoy ocupada" invita
+   * a reintentar mas tarde; "no puedo" pide que alguien vaya a mirar. Con un
+   * solo codigo para ambos, una unidad sin calibrar pareceria simplemente
+   * ocupada para siempre.
+   */
+  ACK_REJECTED  = 3,
 };
 
 typedef struct __attribute__((packed)) {
