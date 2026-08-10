@@ -199,7 +199,8 @@ static void handleCmd(const CmdPacket &cmd) {
 static void printPhHelp() {
   const PhStats *p = sensorPhStats();
   Serial.println(F("\n--- calibracion de pH ----------------------------"));
-  Serial.printf("  Po = %.3f V   pH = ", p->volts);
+  Serial.printf("  Po = %.3f V  (en el GPIO %.3f V tras el divisor)\n  pH = ",
+                p->volts, p->pinVolts);
   if (sensorPhOk()) {
     Serial.printf("%.2f\n", sensorPh());
   } else {
@@ -276,9 +277,19 @@ static void handleLine(char *line) {
     if (sensorPhCalPointB(v)) {
       const PhStats *p = sensorPhStats();
       Serial.printf("[pH] dos puntos: pendiente %.2f mV/pH.\n", p->slope);
-      if (fabsf(p->slope) < 40.0f || fabsf(p->slope) > 80.0f) {
-        Serial.println(F("     AVISO: la pendiente se aleja mucho de los -59 mV/pH\n"
-                         "     teoricos. Revisa los patrones o la sonda."));
+      /*
+       * El aviso mira la pendiente contra los -59.16 mV/pH de Nernst. Un
+       * electrodo de vidrio NO puede superarlos — es termodinamica — asi que
+       * una pendiente mayor solo puede venir de la ganancia del modulo o de
+       * unos patrones mal medidos. Con tiras reactivas las dos causas son
+       * indistinguibles, y por eso el aviso informa en vez de rechazar.
+       */
+      const float gain = fabsf(p->slope) / 59.16f;
+      if (gain < 0.8f || gain > 1.2f) {
+        Serial.printf("     AVISO: implica una ganancia de modulo de x%.2f.\n"
+                      "     Plausible en un HW-828, pero tambien lo seria un\n"
+                      "     error de +-0.5 en las tiras. Con tiras no se puede\n"
+                      "     distinguir: anota la incertidumbre en la memoria.\n", gain);
       }
     } else {
       Serial.println(F("[pH] falta el primer punto ('ca'), el valor esta fuera\n"

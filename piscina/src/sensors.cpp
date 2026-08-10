@@ -194,6 +194,24 @@ static bool findProbe() {
 #define PH_SAMPLES            64
 #define PH_SAMPLE_PERIOD_MS   500
 
+/* Peso de cada muestra nueva en el filtro. Ver la nota en phSample(). */
+#define PH_FILTER_ALPHA       0.1f
+
+/*
+ * Divisor resistivo entre Po y el GPIO. OBLIGATORIO en este montaje.
+ *
+ * Medido en placa: el HW-828 entrega 4.0 V con la sonda en bicarbonato, y la
+ * entrada del ESP32-S3 admite 3.3. Conectarlo directo degrada o destruye el
+ * ADC, y sin aviso.
+ *
+ * Con dos resistencias IGUALES el GPIO ve la mitad, asi que aqui se
+ * multiplica por 2 para volver a la tension real de Po. Si algun dia se
+ * cambia la relacion del divisor, este es el unico numero que hay que tocar
+ * — pero entonces hay que RECALIBRAR, porque el desplazamiento guardado en
+ * NVS esta expresado en voltios de Po.
+ */
+#define PH_DIVIDER_GAIN       2.0f
+
 static Preferences phPrefs;
 static PhStats     ph;
 static uint32_t    lastPhSample = 0;
@@ -221,15 +239,40 @@ static void phSample() {
     acc += analogReadMilliVolts(PIN_PH_ADC);
   }
   const float mv = (float)acc / PH_SAMPLES;
-  ph.volts = mv / 1000.0f;
+  float atPin = mv / 1000.0f;
+
+  /*
+   * Filtro exponencial sobre la tension.
+   *
+   * Promediar 64 muestras seguidas quita el ruido rapido, pero queda una
+   * deriva de +-20 mV entre lecturas que a 59 mV por unidad de pH son +-0.3
+   * de dispersion — medido en banco: 8.89, 8.27, 8.68, 8.41 en el mismo
+   * vaso quieto.
+   *
+   * Con alfa 0.1 y una muestra cada 500 ms, la constante de tiempo queda en
+   * unos 5 s. Eso no pierde NADA de informacion util: el pH de una piscina
+   * de camarones cambia en horas. Lo unico que se sacrifica es velocidad de
+   * respuesta que aqui no sirve para nada.
+   */
+  if (ph.reads == 0) {
+    ph.filtV = atPin;   /* primera muestra: se siembra el filtro */
+  } else {
+    ph.filtV += PH_FILTER_ALPHA * (atPin - ph.filtV);
+  }
+  atPin = ph.filtV;
+
+  /* Se deshace el divisor: lo que se publica es la tension REAL de Po, que
+   * es la que se mide con el multimetro y la que tiene sentido comparar. */
+  ph.volts    = atPin * PH_DIVIDER_GAIN;
+  ph.pinVolts = atPin;
   ph.reads++;
 
   /*
-   * Con 11 dB de atenuacion el ADC del ESP32-S3 mide hasta unos 3.1 V. Si la
-   * lectura se pega ahi, la señal esta recortada y el pH que salga seria
-   * mentira: hace falta un divisor entre Po y el GPIO.
+   * Con 11 dB de atenuacion el ADC del ESP32-S3 mide hasta unos 3.1 V. La
+   * saturacion se comprueba en el PIN, no en Po: es el pin el que recorta.
+   * Con el divisor de 2 esto solo deberia saltar si Po pasa de ~6.2 V.
    */
-  if (ph.volts >= 3.05f) {
+  if (atPin >= 3.05f) {
     ph.saturated++;
   }
 }
@@ -242,8 +285,8 @@ float sensorPh() {
   if (!ph.calibrated) {
     return NAN;
   }
-  if (ph.volts >= 3.05f) {
-    return NAN;   /* señal recortada: no se inventa un valor */
+  if (ph.pinVolts >= 3.05f) {
+    return NAN;   /* señal recortada en el pin: no se inventa un valor */
   }
 
   /*

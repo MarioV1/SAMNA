@@ -93,7 +93,9 @@ void sensorPhCalReset();
 typedef struct {
   bool     calibrated;
   bool     twoPoint;     /* true si la pendiente se midio, false si es teorica */
-  float    volts;        /* ultima tension leida en Po                */
+  float    volts;        /* tension REAL en Po, deshecho el divisor   */
+  float    pinVolts;     /* la que ve el GPIO, ya dividida y filtrada */
+  float    filtV;        /* estado interno del filtro exponencial     */
   float    slope;        /* mV por unidad de pH (negativa)            */
   float    offsetPh;     /* pH en el punto de referencia              */
   float    offsetV;      /* tension en ese punto                      */
