@@ -83,6 +83,15 @@ DoseResult actuatorsStartDose(uint8_t grams);
 bool      actuatorsBusy();
 DoseState actuatorsDoseState();
 
+/*
+ * t_on planificado para el ciclo en curso, compensacion de rampa incluida.
+ *
+ * Existe para que los mensajes no mientan: recalcular gramos/m_punto por
+ * fuera daba un numero distinto del que la maquina iba a usar, y el log
+ * decia 1846 ms mientras el sinfin giraba 1946.
+ */
+uint32_t actuatorsPlannedMs();
+
 /* Nivel del aspersor, 0-10. Se aplica en el proximo ciclo; no arranca el
  * motor por si solo. */
 void    actuatorsSetSprayerLevel(uint8_t level);

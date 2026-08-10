@@ -183,8 +183,7 @@ static void handleCmd(const CmdPacket &cmd) {
       Serial.printf("[FEED seq=%-5u] aceptado: %u g -> %lu ms de sinfin, "
                     "aspersor %u/10 -> ACK_OK\n",
                     cmd.hdr.seq, curGrams,
-                    (unsigned long)(curGrams / actuatorsRate() * 1000.0f),
-                    curSprayer);
+                    (unsigned long)actuatorsPlannedMs(), curSprayer);
       linkAckFeed(cmd.hdr.seq, ACK_OK);
       break;
 

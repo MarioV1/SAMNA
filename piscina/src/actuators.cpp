@@ -208,6 +208,10 @@ DoseState actuatorsDoseState() {
   return state;
 }
 
+uint32_t actuatorsPlannedMs() {
+  return onMs;
+}
+
 void actuatorsSetSprayerLevel(uint8_t level) {
   sprayLevel = (level > SPRAYER_LEVEL_MAX) ? SPRAYER_LEVEL_MAX : level;
 }
