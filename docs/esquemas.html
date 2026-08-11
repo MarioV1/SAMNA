@@ -1,0 +1,837 @@
+<title>Alimentadora — esquemas de conexión</title>
+
+<style>
+  :root {
+    --ground:  #F6F7F8;
+    --surface: #FFFFFF;
+    --sunk:    #EDEFF2;
+    --line:    #DCE0E6;
+    --ink:     #191E25;
+    --muted:   #5B6573;
+    --accent:  #B4740F;
+    --accent-soft: #FBF1DE;
+    --danger:  #B3392B;
+    --danger-soft: #FBEAE7;
+    --ok:      #226D5D;
+    --ok-soft: #E4F1EE;
+    --wire-red:    #C0392B;
+    --wire-black:  #2B3038;
+    --wire-yellow: #C99A12;
+    --wire-blue:   #2C6BA8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1319;
+      --surface: #161B22;
+      --sunk:    #1C222B;
+      --line:    #2A313B;
+      --ink:     #E3E7ED;
+      --muted:   #909BA9;
+      --accent:  #E0A33C;
+      --accent-soft: #2A2113;
+      --danger:  #EE6C59;
+      --danger-soft: #2E1815;
+      --ok:      #55B79F;
+      --ok-soft: #14231F;
+      --wire-red:    #E5695A;
+      --wire-black:  #9AA4B2;
+      --wire-yellow: #E0B740;
+      --wire-blue:   #6CA6DC;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #0F1319;
+    --surface: #161B22;
+    --sunk:    #1C222B;
+    --line:    #2A313B;
+    --ink:     #E3E7ED;
+    --muted:   #909BA9;
+    --accent:  #E0A33C;
+    --accent-soft: #2A2113;
+    --danger:  #EE6C59;
+    --danger-soft: #2E1815;
+    --ok:      #55B79F;
+    --ok-soft: #14231F;
+    --wire-red:    #E5695A;
+    --wire-black:  #9AA4B2;
+    --wire-yellow: #E0B740;
+    --wire-blue:   #6CA6DC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 22px 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  /* ---------- cabecera ---------- */
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 38px);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  nav.jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 6px;
+  }
+
+  nav.jump a {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 11px;
+  }
+  nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+  nav.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- secciones ---------- */
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  h2 {
+    margin: 0;
+    font-size: 23px;
+    font-weight: 640;
+    letter-spacing: -0.015em;
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  h2 .step {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-left: 10px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  p { margin: 0; max-width: 66ch; }
+
+  .block { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ---------- diagramas ---------- */
+
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; width: 100%; height: auto; min-width: 460px; }
+  figcaption {
+    margin-top: 12px;
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 60ch;
+  }
+
+  svg text {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    fill: var(--ink);
+  }
+  svg text.small { font-size: 10.5px; fill: var(--muted); }
+  svg .box { fill: var(--sunk); stroke: var(--line); stroke-width: 1.5; }
+  svg .wire { stroke-width: 2.5; fill: none; stroke-linecap: round; }
+  svg .pad { stroke: var(--line); stroke-width: 1; }
+
+  /* ---------- tablas ---------- */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    background: var(--sunk);
+  }
+  td.mono, th.mono, td code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  td.mono { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: var(--sunk);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  .swatch {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    margin-right: 7px;
+    vertical-align: baseline;
+  }
+
+  /* ---------- avisos ---------- */
+
+  .warn {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--danger-soft);
+    border-left: 3px solid var(--danger);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .warn .title {
+    font-weight: 650;
+    font-size: 14.5px;
+    color: var(--danger);
+    letter-spacing: -0.005em;
+  }
+  .warn p { font-size: 14.5px; max-width: 62ch; }
+
+  .note {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--ok-soft);
+    border-left: 3px solid var(--ok);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .note .title { font-weight: 650; font-size: 14.5px; color: var(--ok); }
+  .note p { font-size: 14.5px; max-width: 62ch; }
+
+  .pending {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .pending .title { font-weight: 650; font-size: 14.5px; color: var(--accent); }
+  .pending p { font-size: 14.5px; max-width: 62ch; }
+
+  ul { margin: 0; padding-left: 20px; max-width: 64ch; }
+  li { margin-bottom: 5px; }
+  li:last-child { margin-bottom: 0; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 28px 16px 60px; gap: 32px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Alimentadora acuícola · Piscina</div>
+    <h1>Esquemas de conexión</h1>
+    <p class="lede">
+      Micrófono MAX4466 y propulsión con ESC bidireccionales. Cada bloque en dos
+      versiones: la <strong>mínima</strong> para probar en el banco y la
+      <strong>definitiva</strong> con condensadores para el montaje final.
+    </p>
+    <nav class="jump">
+      <a href="#max">MAX4466</a>
+      <a href="#ph">Filtro del pH</a>
+      <a href="#esc">Propulsión</a>
+      <a href="#pinout">Pinout completo</a>
+      <a href="#comandos">Comandos de banco</a>
+    </nav>
+  </header>
+
+  <!-- ============================ MAX4466 ============================ -->
+  <section id="max">
+    <h2>MAX4466 <span class="step">paso 5c · micrófono</span></h2>
+
+    <p>
+      Amplificador de micrófono electret. Mide la actividad de alimentación:
+      el ruido de los camarones comiendo en superficie.
+    </p>
+
+    <div class="warn">
+      <div class="title">Aliméntalo a 3V3, nunca a 5 V</div>
+      <p>
+        La salida no oscila alrededor de cero: se centra en <strong>la mitad de
+        su alimentación</strong> y el sonido la hace subir y bajar desde ahí. A
+        5 V el reposo queda en 2,5 V y los picos superan los 3,3 V que admite la
+        entrada del ESP32‑S3.
+      </p>
+      <p>
+        A 3V3 el reposo cae en 1,65 V y todo el recorrido queda dentro de rango.
+        El módulo funciona desde 2,4 V, así que no pierdes nada.
+      </p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 620 210" role="img" aria-label="Diagrama de conexión del MAX4466 a la Heltec">
+        <rect class="box" x="14" y="26" width="150" height="158" rx="6"/>
+        <text x="89" y="49" text-anchor="middle" font-weight="600">Heltec V3</text>
+        <text class="small" x="89" y="65" text-anchor="middle">unidad Piscina</text>
+
+        <rect class="box" x="452" y="46" width="154" height="118" rx="6"/>
+        <text x="529" y="70" text-anchor="middle" font-weight="600">MAX4466</text>
+        <text class="small" x="529" y="86" text-anchor="middle">amplificador electret</text>
+        <circle cx="529" cy="126" r="20" fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+        <circle cx="529" cy="126" r="7" fill="var(--muted)" opacity="0.35"/>
+
+        <!-- 3V3 -->
+        <circle class="pad" cx="164" cy="92" r="4" fill="var(--wire-red)"/>
+        <circle class="pad" cx="452" cy="92" r="4" fill="var(--wire-red)"/>
+        <path class="wire" stroke="var(--wire-red)" d="M164 92 H452"/>
+        <text x="308" y="85" text-anchor="middle" fill="var(--wire-red)">rojo</text>
+        <text class="small" x="176" y="107">3V3</text>
+        <text class="small" x="440" y="107" text-anchor="end">VCC</text>
+
+        <!-- GND -->
+        <circle class="pad" cx="164" cy="128" r="4" fill="var(--wire-black)"/>
+        <circle class="pad" cx="452" cy="128" r="4" fill="var(--wire-black)"/>
+        <path class="wire" stroke="var(--wire-black)" d="M164 128 H452"/>
+        <text x="308" y="121" text-anchor="middle" fill="var(--wire-black)">negro</text>
+        <text class="small" x="176" y="143">GND</text>
+        <text class="small" x="440" y="143" text-anchor="end">GND</text>
+
+        <!-- OUT -->
+        <circle class="pad" cx="164" cy="164" r="4" fill="var(--wire-yellow)"/>
+        <circle class="pad" cx="452" cy="164" r="4" fill="var(--wire-yellow)"/>
+        <path class="wire" stroke="var(--wire-yellow)" d="M164 164 H452"/>
+        <text x="308" y="157" text-anchor="middle" fill="var(--wire-yellow)">señal</text>
+        <text class="small" x="176" y="179">GPIO 6</text>
+        <text class="small" x="440" y="179" text-anchor="end">OUT</text>
+      </svg>
+      <figcaption>
+        <strong>Versión mínima — para probar en el banco.</strong> Tres cables y
+        nada más. Funciona, y con el cable corto sobre la mesa da lecturas
+        limpias.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <svg viewBox="0 0 620 210" role="img" aria-label="MAX4466 con condensador de desacoplo">
+        <rect class="box" x="14" y="26" width="150" height="158" rx="6"/>
+        <text x="89" y="49" text-anchor="middle" font-weight="600">Heltec V3</text>
+        <text class="small" x="89" y="65" text-anchor="middle">unidad Piscina</text>
+
+        <rect class="box" x="452" y="46" width="154" height="118" rx="6"/>
+        <text x="529" y="70" text-anchor="middle" font-weight="600">MAX4466</text>
+        <text class="small" x="529" y="86" text-anchor="middle">amplificador electret</text>
+        <circle cx="529" cy="126" r="20" fill="none" stroke="var(--muted)" stroke-width="1.5"/>
+        <circle cx="529" cy="126" r="7" fill="var(--muted)" opacity="0.35"/>
+
+        <circle cx="164" cy="92" r="4" fill="var(--wire-red)"/>
+        <circle cx="452" cy="92" r="4" fill="var(--wire-red)"/>
+        <path class="wire" stroke="var(--wire-red)" d="M164 92 H452"/>
+        <text class="small" x="176" y="107">3V3</text>
+        <text class="small" x="440" y="107" text-anchor="end">VCC</text>
+
+        <circle cx="164" cy="128" r="4" fill="var(--wire-black)"/>
+        <circle cx="452" cy="128" r="4" fill="var(--wire-black)"/>
+        <path class="wire" stroke="var(--wire-black)" d="M164 128 H452"/>
+        <text class="small" x="176" y="143">GND</text>
+        <text class="small" x="440" y="143" text-anchor="end">GND</text>
+
+        <circle cx="164" cy="164" r="4" fill="var(--wire-yellow)"/>
+        <circle cx="452" cy="164" r="4" fill="var(--wire-yellow)"/>
+        <path class="wire" stroke="var(--wire-yellow)" d="M164 164 H452"/>
+        <text class="small" x="176" y="179">GPIO 6</text>
+        <text class="small" x="440" y="179" text-anchor="end">OUT</text>
+
+        <!-- condensador de desacoplo, pegado al modulo -->
+        <path class="wire" stroke="var(--accent)" d="M414 92 V102"/>
+        <path class="wire" stroke="var(--accent)" d="M402 102 H426"/>
+        <path class="wire" stroke="var(--accent)" d="M402 110 H426"/>
+        <path class="wire" stroke="var(--accent)" d="M414 110 V128"/>
+        <text class="small" x="392" y="108" text-anchor="end" fill="var(--accent)">0,1 µF</text>
+      </svg>
+      <figcaption>
+        <strong>Versión definitiva — con desacoplo.</strong> Un cerámico de
+        0,1 µF entre <code>VCC</code> y <code>GND</code>, soldado <em>en el propio
+        módulo</em>. Cuanto más cerca del chip, más sirve: lo que filtra son
+        flancos rápidos, y unos centímetros de cable ya los deja pasar.
+      </figcaption>
+    </figure>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>MAX4466</th><th>Heltec V3</th><th>Nota</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono"><span class="swatch" style="background:var(--wire-red)"></span>VCC</td>
+            <td class="mono">3V3</td>
+            <td>Nunca 5 V, ni <code>Ve</code>/<code>Vext</code></td>
+          </tr>
+          <tr>
+            <td class="mono"><span class="swatch" style="background:var(--wire-black)"></span>GND</td>
+            <td class="mono">GND</td>
+            <td>Masa común obligatoria</td>
+          </tr>
+          <tr>
+            <td class="mono"><span class="swatch" style="background:var(--wire-yellow)"></span>OUT</td>
+            <td class="mono">GPIO 6</td>
+            <td><code>PIN_SOUND_ADC</code> · ADC1_CH5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="block">
+      <h3>Ajuste de ganancia</h3>
+      <p>
+        Detrás del módulo hay un potenciómetro diminuto que va de <strong>25× a
+        125×</strong>. Se gira con un destornillador de relojero. Empieza por la
+        mitad y ajústalo con el ruido real: si el valor se pega al tope del ADC,
+        bájalo.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>Ruido de alimentación</h3>
+      <p>
+        Es el sensor más sensible del sistema — amplifica microvoltios. Aliméntalo
+        del <code>3V3</code> de la Heltec, no de un convertidor conmutado. Si
+        alguna vez cuelga del buck, compara la dispersión de la lectura antes y
+        después: es el mismo método que usamos para el pH.
+      </p>
+    </div>
+
+    <div class="warn">
+      <div class="title">En la salida no pongas nada</div>
+      <p>
+        El desacoplo va en la <strong>alimentación</strong>. La línea
+        <code>OUT</code> no se toca: ahí la señal <em>es</em> alterna — el ruido
+        de los camarones comiendo. Un condensador a masa en esa línea se la
+        comería y solo quedaría el reposo de 1,65 V.
+      </p>
+    </div>
+
+    <div class="pending">
+      <div class="title">El firmware todavía no existe</div>
+      <p>
+        La lectura del MAX4466 es el único bloque de código que quedó sin escribir.
+        Cuando tengas el sensor cableado, se programa junto con el bit
+        <code>ST_SOUND_FAULT</code> — mientras no esté verificado, Estacion debe
+        omitir <code>/nivelSonido</code> en vez de publicar el ruido de un pin al
+        aire, que parece un dato real.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================ pH ============================ -->
+  <section id="ph">
+    <h2>Filtro del pH <span class="step">mejora opcional · ya cableado</span></h2>
+
+    <p>
+      El divisor que montaste sigue igual. Lo único que se añade es
+      <strong>un condensador</strong> entre el nodo central y masa.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 620 200" role="img" aria-label="Filtro RC en la entrada del ADC de pH">
+        <rect class="box" x="450" y="30" width="156" height="72" rx="6"/>
+        <text x="528" y="54" text-anchor="middle" font-weight="600">HW-828</text>
+        <text class="small" x="528" y="70" text-anchor="middle">modulo de pH</text>
+        <text class="small" x="528" y="88" text-anchor="middle">Po ≈ 4,0 V</text>
+
+        <rect class="box" x="14" y="30" width="130" height="72" rx="6"/>
+        <text x="79" y="54" text-anchor="middle" font-weight="600">Heltec V3</text>
+        <text class="small" x="79" y="72" text-anchor="middle">GPIO 5 · ADC</text>
+
+        <!-- Po -> R1 -> nodo -->
+        <path class="wire" stroke="var(--wire-red)" d="M450 66 H360"/>
+        <rect x="300" y="57" width="58" height="18" rx="3" fill="var(--sunk)" stroke="var(--ink)" stroke-width="1.5"/>
+        <text class="small" x="329" y="70" text-anchor="middle">10 k</text>
+        <path class="wire" stroke="var(--wire-red)" d="M300 66 H236"/>
+        <circle cx="236" cy="66" r="5" fill="var(--wire-red)"/>
+        <text class="small" x="236" y="46" text-anchor="middle">nodo · 2,0 V</text>
+
+        <!-- nodo -> GPIO -->
+        <path class="wire" stroke="var(--wire-yellow)" d="M236 66 H144"/>
+
+        <!-- nodo -> R2 -> GND -->
+        <path class="wire" stroke="var(--wire-black)" d="M236 66 V104"/>
+        <rect x="227" y="104" width="18" height="52" rx="3" fill="var(--sunk)" stroke="var(--ink)" stroke-width="1.5"/>
+        <text class="small" x="262" y="134">10 k</text>
+        <path class="wire" stroke="var(--wire-black)" d="M236 156 V176 H460"/>
+        <text class="small" x="200" y="172" text-anchor="end">GND</text>
+
+        <!-- condensador nuevo -->
+        <path class="wire" stroke="var(--accent)" d="M368 66 V112"/>
+        <path class="wire" stroke="var(--accent)" d="M354 112 H382"/>
+        <path class="wire" stroke="var(--accent)" d="M354 122 H382"/>
+        <path class="wire" stroke="var(--accent)" d="M368 122 V176"/>
+        <circle cx="368" cy="66" r="4" fill="var(--accent)"/>
+        <text class="small" x="392" y="120" fill="var(--accent)">1 µF</text>
+      </svg>
+      <figcaption>
+        Sin resistencia extra: el propio divisor ya da la impedancia. Ojo a dónde
+        va el condensador — del <strong>nodo central</strong> a masa, en paralelo
+        con la resistencia inferior.
+      </figcaption>
+    </figure>
+
+    <div class="note">
+      <div class="title">Por qué basta un condensador</div>
+      <p>
+        La impedancia vista desde el nodo son las dos resistencias en paralelo:
+        <strong>5 kΩ</strong>. Con 1 µF eso da un filtro paso bajo a
+        <strong>32 Hz</strong>.
+      </p>
+      <p>
+        Un pH cambia en minutos, así que cortar por encima de 32 Hz no pierde
+        absolutamente nada y quita el ruido de conmutación que pueda llegar por
+        la alimentación.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">De paso mejora la precisión del ADC</div>
+      <p>
+        La entrada del ESP32‑S3 toma una pequeña carga cada vez que muestrea, y
+        prefiere ver menos de 10 kΩ de impedancia. Tus 5 kΩ están dentro pero sin
+        holgura; el condensador le entrega esa carga al instante y la lectura
+        deja de depender de la fuente.
+      </p>
+      <p>
+        Va <strong>además</strong> del filtro exponencial que ya tiene el
+        firmware, no en su lugar: uno quita ruido eléctrico y el otro deriva
+        lenta. No se estorban.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================ PROPULSIÓN ============================ -->
+  <section id="esc">
+    <h2>Propulsión <span class="step">paso 7 · ESC + brushless</span></h2>
+
+    <p>
+      Dos APISQUEEN U2 MINI, un ESC bidireccional por motor. El diagrama muestra
+      <strong>un canal</strong>; el segundo es idéntico cambiando solo el pin de
+      señal.
+    </p>
+
+    <div class="warn">
+      <div class="title">Quita las hélices para cualquier prueba en seco</div>
+      <p>
+        Son motores de 130 W. Todo lo que hay que comprobar en el banco — armado,
+        sentido de giro, mezcla diferencial — se ve con los ejes desnudos.
+      </p>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 620 268" role="img" aria-label="Diagrama de conexión de un ESC y su motor">
+        <rect class="box" x="14" y="20" width="132" height="150" rx="6"/>
+        <text x="80" y="43" text-anchor="middle" font-weight="600">Heltec V3</text>
+        <text class="small" x="80" y="59" text-anchor="middle">señal 3,3 V</text>
+
+        <rect class="box" x="266" y="20" width="130" height="150" rx="6"/>
+        <text x="331" y="43" text-anchor="middle" font-weight="600">ESC</text>
+        <text class="small" x="331" y="59" text-anchor="middle">bidireccional</text>
+
+        <rect class="box" x="500" y="46" width="106" height="98" rx="6"/>
+        <text x="553" y="82" text-anchor="middle" font-weight="600">U2 MINI</text>
+        <text class="small" x="553" y="99" text-anchor="middle">brushless</text>
+
+        <!-- señal -->
+        <circle class="pad" cx="146" cy="90" r="4" fill="var(--wire-yellow)"/>
+        <circle class="pad" cx="266" cy="90" r="4" fill="var(--wire-yellow)"/>
+        <path class="wire" stroke="var(--wire-yellow)" d="M146 90 H266"/>
+        <text class="small" x="206" y="83" text-anchor="middle">señal</text>
+        <text class="small" x="156" y="105">GPIO 2 / 4</text>
+
+        <!-- masa -->
+        <circle class="pad" cx="146" cy="132" r="4" fill="var(--wire-black)"/>
+        <circle class="pad" cx="266" cy="132" r="4" fill="var(--wire-black)"/>
+        <path class="wire" stroke="var(--wire-black)" d="M146 132 H266"/>
+        <text class="small" x="206" y="125" text-anchor="middle">masa común</text>
+        <text class="small" x="156" y="147">GND</text>
+
+        <!-- tres fases -->
+        <path class="wire" stroke="var(--wire-blue)" d="M396 74 H500"/>
+        <path class="wire" stroke="var(--wire-blue)" d="M396 95 H500"/>
+        <path class="wire" stroke="var(--wire-blue)" d="M396 116 H500"/>
+        <text class="small" x="448" y="66" text-anchor="middle">3 fases</text>
+        <text class="small" x="448" y="137" text-anchor="middle" fill="var(--accent)">cambia 2 → invierte</text>
+
+        <!-- barra 12 V -->
+        <path class="wire" stroke="var(--wire-red)" d="M120 214 H560"/>
+        <path class="wire" stroke="var(--wire-black)" d="M120 240 H560"/>
+        <path class="wire" stroke="var(--wire-red)" d="M312 214 V170"/>
+        <path class="wire" stroke="var(--wire-black)" d="M350 240 V170"/>
+        <path class="wire" stroke="var(--wire-black)" d="M120 240 H90 V132 H146"/>
+        <text class="small" x="118" y="207">+12 V · LiFePO4</text>
+        <text class="small" x="118" y="256">GND común</text>
+        <text class="small" x="566" y="218">B+</text>
+        <text class="small" x="566" y="244">B−</text>
+      </svg>
+      <figcaption>
+        <strong>Versión mínima.</strong> La masa de la señal y la de los 12 V
+        tienen que ser la misma. Sin masa común, el ESC no sabe respecto a qué
+        son esos 3,3 V del pulso.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <svg viewBox="0 0 620 160" role="img" aria-label="Condensador de reserva junto al ESC">
+        <rect class="box" x="220" y="24" width="130" height="76" rx="6"/>
+        <text x="285" y="52" text-anchor="middle" font-weight="600">ESC</text>
+        <text class="small" x="285" y="70" text-anchor="middle">B+ · B−</text>
+
+        <path class="wire" stroke="var(--wire-red)" d="M40 48 H220"/>
+        <path class="wire" stroke="var(--wire-black)" d="M40 128 H220 V100"/>
+        <path class="wire" stroke="var(--wire-red)" d="M220 48 H220"/>
+        <text class="small" x="44" y="40">+12 V</text>
+        <text class="small" x="44" y="146">GND</text>
+
+        <!-- condensador de reserva, pegado al ESC -->
+        <path class="wire" stroke="var(--accent)" d="M180 48 V70"/>
+        <path class="wire" stroke="var(--accent)" d="M164 70 H196"/>
+        <path class="wire" stroke="var(--accent)" d="M164 82 H196"/>
+        <path class="wire" stroke="var(--accent)" d="M180 82 V128"/>
+        <circle cx="180" cy="48" r="4" fill="var(--accent)"/>
+        <circle cx="180" cy="128" r="4" fill="var(--accent)"/>
+        <text class="small" x="156" y="72" text-anchor="end" fill="var(--accent)">1000 µF</text>
+        <text class="small" x="156" y="86" text-anchor="end" fill="var(--accent)">25 V</text>
+
+        <text class="small" x="380" y="52">lo más cerca del ESC que se pueda</text>
+        <text class="small" x="380" y="70">uno por cada ESC</text>
+        <text class="small" x="380" y="88">respeta la polaridad</text>
+      </svg>
+      <figcaption>
+        <strong>Versión definitiva.</strong> Los ESC traen sus propios
+        condensadores, pero dimensionados para cables cortos. El metro de cable
+        hasta la batería añade inductancia, y el ESC ve sobretensiones al
+        arrancar que los suyos no llegan a tapar.
+      </figcaption>
+    </figure>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Conexión</th><th>Babor</th><th>Estribor</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Señal del ESC</td>
+            <td class="mono">GPIO 2</td>
+            <td class="mono">GPIO 4</td>
+          </tr>
+          <tr>
+            <td>Masa de señal</td>
+            <td class="mono">GND</td>
+            <td class="mono">GND</td>
+          </tr>
+          <tr>
+            <td>Alimentación del ESC</td>
+            <td class="mono">12 V</td>
+            <td class="mono">12 V</td>
+          </tr>
+          <tr>
+            <td>Motor</td>
+            <td class="mono">3 fases</td>
+            <td class="mono">3 fases</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warn">
+      <div class="title">El adaptador de 3 A no sirve con hélices en el agua</div>
+      <p>
+        Cada U2 MINI llega a <strong>8 A</strong>. Los dos juntos pueden pedir
+        16 A, más de cinco veces lo que da el adaptador. Para el banco sin hélices
+        sobra; para navegar hace falta la LiFePO4 con cable de sección adecuada.
+      </p>
+    </div>
+
+    <div class="warn">
+      <div class="title">No conectes el BEC del ESC a la Heltec</div>
+      <p>
+        Muchos ESC sacan 5 V por el conector de señal para alimentar un receptor
+        de radio. La Heltec ya va alimentada por USB o por su propio buck, y
+        juntar dos fuentes en el mismo raíl es la forma rápida de perder una
+        placa. <strong>Conecta solo señal y masa</strong>; deja el cable central
+        del conector sin usar.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Verificado con osciloscopio el 2026‑08‑10</div>
+      <p>
+        La señal ya está comprobada en ambos canales: 50 Hz, período 20,0 ms,
+        1500 µs de neutro, 3,3 V de amplitud, y mezcla diferencial correcta en
+        los cuatro sentidos. Lo que falta es solo el hardware.
+      </p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Comando</th><th class="mono">Babor</th><th class="mono">Estribor</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Neutro / parado</td><td class="mono">1500 µs</td><td class="mono">1500 µs</td></tr>
+          <tr><td>Adelante</td><td class="mono">1800 µs</td><td class="mono">1800 µs</td></tr>
+          <tr><td>Atrás</td><td class="mono">1200 µs</td><td class="mono">1200 µs</td></tr>
+          <tr><td>Giro horario</td><td class="mono">1800 µs</td><td class="mono">1200 µs</td></tr>
+          <tr><td>Giro antihorario</td><td class="mono">1200 µs</td><td class="mono">1800 µs</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="block">
+      <h3>Secuencia de la primera prueba</h3>
+      <ul>
+        <li><strong>Hélices fuera.</strong> Sujeta los motores a algo firme.</li>
+        <li><strong>Comprueba la señal</strong> antes de dar los 12 V: el pin contra GND debe estar emitiendo el pulso de neutro.</li>
+        <li><strong>Alimenta los ESC.</strong> Deben pitar su secuencia de armado. Si uno no pita, ese ESC no armó y no sigas.</li>
+        <li><strong>Espera 2 segundos</strong> de neutro antes de mandar nada. El firmware ya lo respeta solo.</li>
+        <li><strong><code>tv 1</code></strong> — ambos ejes deben girar hacia avante.</li>
+        <li><strong><code>tv 3</code></strong> — deben girar en sentidos opuestos.</li>
+        <li><strong><code>tv 0</code> o <code>x</code></strong> para parar. Los comandos de consola <strong>no caducan</strong>.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>Si un motor gira al revés</h3>
+      <p>
+        Intercambia <strong>dos cualesquiera de los tres cables del motor</strong>.
+        No toques la señal ni el firmware: en un brushless el sentido lo fija el
+        orden de las fases, y es la corrección estándar.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================ PINOUT ============================ -->
+  <section id="pinout">
+    <h2>Pinout completo de Piscina <span class="step">para no pisar nada</span></h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>GPIO</th><th>Función</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">2</td><td>ESC babor · señal servo</td><td>señal verificada</td></tr>
+          <tr><td class="mono">4</td><td>ESC estribor · señal servo</td><td>señal verificada</td></tr>
+          <tr><td class="mono">5</td><td>pH · <code>Po</code> tras divisor 1:2</td><td>calibrado</td></tr>
+          <tr><td class="mono">6</td><td>MAX4466 · <code>OUT</code></td><td>por cablear</td></tr>
+          <tr><td class="mono">7</td><td>DS18B20 · 1‑Wire, pull‑up 4,7 kΩ</td><td>funcionando</td></tr>
+          <tr><td class="mono">47</td><td>Dosificador · <code>RPWM</code> del BTS7960</td><td>calibrado</td></tr>
+          <tr><td class="mono">48</td><td>Aspersor · <code>RPWM</code> del BTS7960</td><td>calibrado</td></tr>
+          <tr><td class="mono">19 · 20</td><td>libres, de reserva</td><td>sin verificar con multímetro</td></tr>
+          <tr><td class="mono">1 · 37</td><td>divisor de batería de fábrica</td><td>no reasignar</td></tr>
+          <tr><td class="mono">8–14 · 17 · 18 · 21</td><td>LoRa y OLED de la placa</td><td>intocables</td></tr>
+          <tr><td class="mono">43 · 44</td><td>UART0 → puente CP2102 → USB</td><td>intocables</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <div class="title">Los dos regímenes PWM no se pisan</div>
+      <p>
+        Dosificador y aspersor usan los canales LEDC 0 y 1 sobre el <strong>timer
+        0</strong>, a 1 kHz y 8 bits. Los ESC usan los canales 2 y 3 sobre el
+        <strong>timer 1</strong>, a 50 Hz y 14 bits. Son incompatibles entre sí y
+        por eso van en temporizadores separados.
+      </p>
+      <p>
+        Los 14 bits no son un capricho: el LEDC del ESP32‑S3 no admite más.
+        Estuvo en 16 y los pines de los ESC no emitieron nada durante todo el
+        paso 7.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================ COMANDOS ============================ -->
+  <section id="comandos">
+    <h2>Comandos de banco <span class="step">monitor serial de Piscina</span></h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Comando</th><th>Qué hace</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">?</td><td>Estado completo y lista de comandos</td></tr>
+          <tr><td class="mono">x</td><td><strong>Parar todo</strong> — sinfín, aspersor y ESC a neutro</td></tr>
+          <tr><td class="mono">ti</td><td>Estado de los ESC y lo que se espera ver en el osciloscopio</td></tr>
+          <tr><td class="mono">tg &lt;0‑2&gt;</td><td>Nivel continuo para localizar un pin con multímetro · <code>tg 9</code> sale</td></tr>
+          <tr><td class="mono">tv &lt;0‑4&gt;</td><td>Probar dirección · 0 stop, 1 adelante, 2 atrás, 3 horario, 4 antihorario</td></tr>
+          <tr><td class="mono">tp &lt;pct&gt;</td><td>Empuje de trabajo, 0–100 %</td></tr>
+          <tr><td class="mono">tr &lt;us/ms&gt;</td><td>Velocidad de rampa · <code>0.2</code> para verla en el osciloscopio, <code>2.0</code> normal</td></tr>
+          <tr><td class="mono">ar &lt;ms&gt;</td><td>Correr el sinfín ese tiempo, con la rampa real</td></tr>
+          <tr><td class="mono">ag &lt;g&gt;</td><td>Decirle cuánto pesó lo que salió → calcula <code>ṁ</code></td></tr>
+          <tr><td class="mono">sw · sd · sm · sl</td><td>Barrido, duty crudo, duty mínimo y nivel del aspersor</td></tr>
+          <tr><td class="mono">c1 · ca · cb · cr</td><td>Calibración de pH: un punto, dos puntos, borrar</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Alimentadora acuícola · proyecto de titulación ESPOL · Mario Viteri y Joshua
+    Defilippi. Los valores de este documento están medidos en banco, no
+    estimados. Si algo no coincide con lo que ves, el documento está
+    equivocado — no lo fuerces.
+  </footer>
+
+</div>

@@ -1,0 +1,795 @@
+<title>Alimentadora — batería y alimentación</title>
+
+<style>
+  :root {
+    --ground:  #F6F7F8;
+    --surface: #FFFFFF;
+    --sunk:    #EDEFF2;
+    --line:    #DCE0E6;
+    --ink:     #191E25;
+    --muted:   #5B6573;
+    --accent:  #B4740F;
+    --accent-soft: #FBF1DE;
+    --danger:  #B3392B;
+    --danger-soft: #FBEAE7;
+    --ok:      #226D5D;
+    --ok-soft: #E4F1EE;
+    --wire-red:    #C0392B;
+    --wire-black:  #2B3038;
+    --wire-blue:   #2C6BA8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1319;
+      --surface: #161B22;
+      --sunk:    #1C222B;
+      --line:    #2A313B;
+      --ink:     #E3E7ED;
+      --muted:   #909BA9;
+      --accent:  #E0A33C;
+      --accent-soft: #2A2113;
+      --danger:  #EE6C59;
+      --danger-soft: #2E1815;
+      --ok:      #55B79F;
+      --ok-soft: #14231F;
+      --wire-red:    #E5695A;
+      --wire-black:  #9AA4B2;
+      --wire-blue:   #6CA6DC;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #0F1319;
+    --surface: #161B22;
+    --sunk:    #1C222B;
+    --line:    #2A313B;
+    --ink:     #E3E7ED;
+    --muted:   #909BA9;
+    --accent:  #E0A33C;
+    --accent-soft: #2A2113;
+    --danger:  #EE6C59;
+    --danger-soft: #2E1815;
+    --ok:      #55B79F;
+    --ok-soft: #14231F;
+    --wire-red:    #E5695A;
+    --wire-black:  #9AA4B2;
+    --wire-blue:   #6CA6DC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 22px 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 38px);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  nav.jump { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+  nav.jump a {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 11px;
+  }
+  nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+  nav.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  h2 {
+    margin: 0;
+    font-size: 23px;
+    font-weight: 640;
+    letter-spacing: -0.015em;
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--accent);
+  }
+  h2 .step {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-left: 10px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  p { margin: 0; max-width: 66ch; }
+  .block { display: flex; flex-direction: column; gap: 10px; }
+
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; width: 100%; height: auto; min-width: 520px; }
+  figcaption { margin-top: 12px; font-size: 13.5px; color: var(--muted); max-width: 60ch; }
+
+  svg text {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    fill: var(--ink);
+  }
+  svg text.small { font-size: 10px; fill: var(--muted); }
+  svg .box { fill: var(--sunk); stroke: var(--line); stroke-width: 1.5; }
+  svg .wire { stroke-width: 2.5; fill: none; stroke-linecap: round; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    background: var(--sunk);
+  }
+  td.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 650; background: var(--sunk); }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: var(--sunk);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  .warn, .note, .pending {
+    display: flex; flex-direction: column; gap: 7px;
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .warn   { background: var(--danger-soft); border-left: 3px solid var(--danger); }
+  .note   { background: var(--ok-soft);     border-left: 3px solid var(--ok); }
+  .pending{ background: var(--accent-soft); border-left: 3px solid var(--accent); }
+  .warn .title    { font-weight: 650; font-size: 14.5px; color: var(--danger); }
+  .note .title    { font-weight: 650; font-size: 14.5px; color: var(--ok); }
+  .pending .title { font-weight: 650; font-size: 14.5px; color: var(--accent); }
+  .warn p, .note p, .pending p { font-size: 14.5px; max-width: 62ch; }
+
+  ul { margin: 0; padding-left: 20px; max-width: 64ch; }
+  li { margin-bottom: 5px; }
+  li:last-child { margin-bottom: 0; }
+
+  .big {
+    display: flex; flex-wrap: wrap; gap: 10px;
+  }
+  .stat {
+    flex: 1 1 150px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .stat .n {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 26px; font-weight: 600; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .k { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  .stat.alarm .n { color: var(--danger); }
+  .stat.good  .n { color: var(--ok); }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+
+  @media (max-width: 560px) { .wrap { padding: 28px 16px 60px; gap: 32px; } }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Alimentadora acuícola · Piscina</div>
+    <h1>Batería y alimentación</h1>
+    <p class="lede">
+      Cómo se reparte la energía en la unidad flotante y qué mirar al elegir la
+      batería. Prototipo demostrativo: lo que hay que dimensionar es aguantar
+      una sesión completa sin cortes.
+    </p>
+    <nav class="jump">
+      <a href="#arq">Arquitectura</a>
+      <a href="#picos">Picos de corriente</a>
+      <a href="#energia">Energía diaria</a>
+      <a href="#elegir">Elegir la batería</a>
+      <a href="#proteccion">Protección</a>
+      <a href="#masas">Masas</a>
+      <a href="#caps">Condensadores</a>
+      <a href="#buck">El buck</a>
+    </nav>
+  </header>
+
+  <!-- ===================== ARQUITECTURA ===================== -->
+  <section id="arq">
+    <h2>Arquitectura</h2>
+
+    <figure>
+      <svg viewBox="0 0 660 320" role="img" aria-label="Diagrama de la alimentación de la unidad flotante">
+        <!-- panel + mppt -->
+        <rect class="box" x="14" y="14" width="104" height="46" rx="5"/>
+        <text x="66" y="34" text-anchor="middle">Panel 20 W</text>
+        <text class="small" x="66" y="49" text-anchor="middle">solar</text>
+
+        <rect class="box" x="152" y="14" width="104" height="46" rx="5"/>
+        <text x="204" y="34" text-anchor="middle">MPPT</text>
+        <text class="small" x="204" y="49" text-anchor="middle">perfil LiFePO4</text>
+        <path class="wire" stroke="var(--wire-red)" d="M118 37 H152"/>
+
+        <!-- bateria -->
+        <rect class="box" x="14" y="106" width="104" height="58" rx="5"/>
+        <text x="66" y="130" text-anchor="middle">LiFePO4</text>
+        <text class="small" x="66" y="146" text-anchor="middle">4S · 12,8 V</text>
+        <path class="wire" stroke="var(--wire-red)" d="M204 60 V88 H66 V106"/>
+
+        <!-- fusible -->
+        <rect class="box" x="152" y="112" width="74" height="46" rx="5"/>
+        <text x="189" y="132" text-anchor="middle">fusible</text>
+        <text class="small" x="189" y="147" text-anchor="middle">25–30 A</text>
+        <path class="wire" stroke="var(--wire-red)" d="M118 128 H152"/>
+
+        <!-- interruptor -->
+        <rect class="box" x="258" y="112" width="82" height="46" rx="5"/>
+        <text x="299" y="132" text-anchor="middle">interruptor</text>
+        <text class="small" x="299" y="147" text-anchor="middle">≥ 25 A</text>
+        <path class="wire" stroke="var(--wire-red)" d="M226 135 H258"/>
+
+        <!-- barra -->
+        <path class="wire" stroke="var(--wire-red)" d="M340 135 H392 V38 M392 135 V232"/>
+        <circle cx="392" cy="135" r="4" fill="var(--wire-red)"/>
+
+        <!-- cargas -->
+        <rect class="box" x="432" y="16" width="140" height="44" rx="5"/>
+        <text x="502" y="34" text-anchor="middle">2 ESC + motores</text>
+        <text class="small" x="502" y="49" text-anchor="middle">hasta 16 A</text>
+        <path class="wire" stroke="var(--wire-red)" d="M392 38 H432"/>
+
+        <rect class="box" x="432" y="112" width="140" height="44" rx="5"/>
+        <text x="502" y="130" text-anchor="middle">2 BTS7960</text>
+        <text class="small" x="502" y="145" text-anchor="middle">~2 A</text>
+        <path class="wire" stroke="var(--wire-red)" d="M392 134 H432"/>
+
+        <rect class="box" x="432" y="210" width="66" height="44" rx="5"/>
+        <text x="465" y="228" text-anchor="middle">buck</text>
+        <text class="small" x="465" y="243" text-anchor="middle">12→5 V</text>
+        <path class="wire" stroke="var(--wire-red)" d="M392 232 H432"/>
+
+        <rect class="box" x="524" y="210" width="118" height="44" rx="5"/>
+        <text x="583" y="228" text-anchor="middle">Heltec V3</text>
+        <text class="small" x="583" y="243" text-anchor="middle">~0,2 A</text>
+        <path class="wire" stroke="var(--wire-red)" d="M498 232 H524"/>
+
+        <!-- masa estrella -->
+        <path class="wire" stroke="var(--wire-black)" d="M66 164 V292 H610"/>
+        <circle cx="66" cy="292" r="5" fill="var(--wire-black)"/>
+        <path class="wire" stroke="var(--wire-black)" d="M502 60 V78 H236 V292"/>
+        <path class="wire" stroke="var(--wire-black)" d="M502 156 V180 H340 V292"/>
+        <path class="wire" stroke="var(--wire-black)" d="M583 254 V292"/>
+        <text class="small" x="80" y="308">masa en ESTRELLA — todas al negativo de la batería</text>
+      </svg>
+      <figcaption>
+        El fusible va lo más cerca posible del borne positivo, antes que nada más.
+        Protege el cable, no la carga: si el cable roza y toca masa, es lo único
+        entre una batería de litio y un incendio.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ===================== PICOS ===================== -->
+  <section id="picos">
+    <h2>Picos de corriente <span class="step">esto fija el BMS</span></h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Carga</th><th class="mono">Máximo</th><th>Cuándo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>2 × APISQUEEN U2 MINI</td><td class="mono">16,0 A</td><td>navegando a tope</td></tr>
+          <tr><td>Dosificador + aspersor</td><td class="mono">2,0 A</td><td>durante un ciclo</td></tr>
+          <tr><td>Heltec con LoRa transmitiendo</td><td class="mono">0,25 A</td><td>continuo</td></tr>
+          <tr class="total"><td>Si coincidiera todo</td><td class="mono">18,2 A</td><td>alimentar navegando</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warn">
+      <div class="title">El BMS es lo que hay que mirar, no los amperios‑hora</div>
+      <p>
+        Muchas baterías LiFePO4 pequeñas traen un BMS limitado a 10 o 20 A. Si
+        pides 18 y el BMS corta, <strong>no se apagan solo los motores</strong>:
+        se apaga la Heltec, se pierde el enlace y el catamarán queda a la deriva
+        hasta que el BMS rearme.
+      </p>
+      <p>
+        Busca <strong>30 A continuos como mínimo</strong>. Es el margen que
+        convierte un pico normal en algo que la batería ni nota.
+      </p>
+      <p>
+        Que sea un prototipo demostrativo no rebaja este requisito, lo agrava:
+        un corte de cinco segundos en una piscina es una anécdota, pero el mismo
+        corte <strong>durante la defensa</strong> es el único momento en que no
+        te lo puedes permitir.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Los 18 A son el peor caso teórico</div>
+      <p>
+        En la práctica cuesta que coincidan: la navegación es momentánea — solo
+        mientras el dedo está en el mando — y la alimentación dura minutos, no
+        horas. Pero el BMS hay que dimensionarlo para el peor caso, porque es
+        justo el instante en que no puedes permitirte perder el mando.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ENERGIA ===================== -->
+  <section id="energia">
+    <h2>Energía diaria <span class="step">y el panel de 20 W</span></h2>
+
+    <div class="note">
+      <div class="title">Alcance: prototipo demostrativo</div>
+      <p>
+        El equipo es un prototipo para demostrar el sistema, no una unidad de
+        servicio continuo. Eso cambia lo que hay que dimensionar: importa
+        <strong>aguantar una sesión completa sin cortes</strong>, no sostenerse
+        solo indefinidamente.
+      </p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Sesión de demostración · 1 h</th><th class="mono">Consumo</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Navegación intensa, 15 min</td><td class="mono">2,50 Ah</td></tr>
+          <tr><td>Tres alimentaciones de 3 min</td><td class="mono">0,30 Ah</td></tr>
+          <tr><td>Reposo durante la sesión</td><td class="mono">0,20 Ah</td></tr>
+          <tr class="total"><td>Total por sesión</td><td class="mono">3,00 Ah</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Para referencia, el escenario de servicio continuo — 24 h escuchando,
+      20 min de navegación, cuatro ciclos de alimentación — sería este:
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Concepto</th><th class="mono">Consumo</th><th class="mono">Al día</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Reposo, 24 h escuchando</td><td class="mono">0,20 A</td><td class="mono">4,80 Ah</td></tr>
+          <tr><td>Navegación, 20 min</td><td class="mono">10 A medios</td><td class="mono">3,33 Ah</td></tr>
+          <tr><td>Alimentación, 4 ciclos de 3 min</td><td class="mono">2 A</td><td class="mono">0,40 Ah</td></tr>
+          <tr class="total"><td>Total</td><td class="mono">—</td><td class="mono">8,53 Ah</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="big">
+      <div class="stat good">
+        <div class="n">3,0</div>
+        <div class="k">Ah por sesión de demostración de una hora</div>
+      </div>
+      <div class="stat">
+        <div class="n">5,3</div>
+        <div class="k">Ah/día que aporta el panel con 4,5 h de sol</div>
+      </div>
+      <div class="stat">
+        <div class="n">8,5</div>
+        <div class="k">Ah/día en servicio continuo — fuera del alcance</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Qué aporta el panel</h3>
+      <p>
+        Recarga alrededor de <strong>5,3 Ah al día</strong> con 4,5 horas de sol
+        y un 75 % de rendimiento real, contando suciedad, ángulo y pérdidas del
+        MPPT. Eso repone casi <strong>dos sesiones de demostración diarias</strong>
+        sin tocar el cargador.
+      </p>
+      <p>
+        Para servicio continuo se quedaría corto —8,5 Ah de consumo frente a
+        5,3 de aporte— pero eso está fuera del alcance de este prototipo. Si en
+        la memoria se menciona el panel, basta con describirlo como lo que es:
+        una ayuda que alarga la autonomía entre recargas.
+      </p>
+    </div>
+
+    <div class="pending">
+      <div class="title">Si alguna vez hiciera falta más autonomía</div>
+      <p>
+        La palanca no son los motores: es el <strong>reposo</strong>. Escuchando
+        la radio 24 h seguidas se lleva 4,8 Ah, más de la mitad del día. Cada
+        50 mA que se quiten de ahí valen 1,2 Ah diarios — más que ahorrar un
+        ciclo entero de alimentación.
+      </p>
+      <p>
+        Apagar la OLED, bajar la potencia de transmisión con la estación cerca, o
+        escuchar a intervalos en vez de continuamente. La última cambiaría la
+        latencia del mando, así que sería una decisión de diseño y no un ajuste.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ELEGIR ===================== -->
+  <section id="elegir">
+    <h2>Elegir la batería</h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Criterio</th><th>Qué buscar</th><th>Por qué</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>BMS</strong></td>
+            <td class="mono">≥ 30 A continuos</td>
+            <td>Un corte deja el catamarán a la deriva, no solo sin motores</td>
+          </tr>
+          <tr>
+            <td><strong>Química</strong></td>
+            <td class="mono">LiFePO4 4S</td>
+            <td>12,8 V nominales, 14,6 al cargar — dentro del rango 12–16 V de los ESC</td>
+          </tr>
+          <tr>
+            <td><strong>Capacidad</strong></td>
+            <td class="mono">10 Ah</td>
+            <td>Casi tres sesiones de demostración sin recargar</td>
+          </tr>
+          <tr>
+            <td><strong>Peso</strong></td>
+            <td class="mono">~1,3 kg a 10 Ah</td>
+            <td>Va sobre un catamarán: la mitad que una de 20 Ah</td>
+          </tr>
+          <tr>
+            <td><strong>Conector</strong></td>
+            <td class="mono">XT60 o XT90</td>
+            <td>Polarizado: no se puede enchufar al revés</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warn">
+      <div class="title">No sirve una 3S de iones de litio</div>
+      <p>
+        Una 3S corriente da 11,1 V nominales y baja de 10 V al descargarse,
+        por debajo del mínimo de los ESC. Los propulsores se cortarían con la
+        batería aún medio llena. La LiFePO4 de 4S mantiene la tensión mucho más
+        plana durante toda la descarga, que es justo lo que un motor necesita.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Autonomía en sesiones de demostración</div>
+      <p>
+        Contando el 80 % útil, para no descargarla a fondo:
+        <strong>7 Ah → 1,9 sesiones · 10 Ah → 2,7 · 20 Ah → 5,3</strong>.
+        Con el aporte del panel, una de 10 Ah se repone casi entera cada día.
+      </p>
+    </div>
+
+    <div class="pending">
+      <div class="title">Ojo al combinar poca capacidad con BMS alto</div>
+      <p>
+        Pedirle 30 A a una batería de 10 Ah son <strong>3C</strong> de descarga.
+        Existen y son corrientes, pero no todas las de esa capacidad lo dan:
+        muchas montan un BMS de 10 o 20 A. Comprueba el dato del BMS antes que
+        el de los amperios‑hora, porque es el que se queda corto sin avisar.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== PROTECCION ===================== -->
+  <section id="proteccion">
+    <h2>Protección</h2>
+
+    <div class="block">
+      <h3>Fusible</h3>
+      <p>
+        <strong>25 a 30 A, lo más cerca posible del borne positivo</strong>, antes
+        del interruptor y de todo lo demás. Una LiFePO4 puede entregar cientos de
+        amperios en un cortocircuito sin inmutarse; el fusible está para proteger
+        el <em>cable</em>, no los equipos.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>Sección de cable</h3>
+      <p>
+        Para 18 A en tramos cortos, <strong>AWG 14 como mínimo y AWG 12 con
+        holgura</strong>, solo en el tramo de potencia: batería, fusible,
+        interruptor, ESC. La señal y la alimentación de la Heltec pueden ir en
+        cable fino.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>Condensadores</h3>
+      <p>
+        Hay cuatro sitios donde hacen falta y no son el mismo condensador ni por
+        el mismo motivo. Tienen sección propia: <a href="#caps">Condensadores</a>.
+      </p>
+    </div>
+
+    <div class="warn">
+      <div class="title">Ajusta el MPPT a LiFePO4, no a plomo</div>
+      <p>
+        Muchos controladores baratos vienen configurados para batería de plomo por
+        defecto. Ese perfil carga a la tensión equivocada y algunos aplican una
+        fase de ecualización que <strong>una LiFePO4 no admite</strong>. Busca el
+        perfil <code>LFP</code> o <code>LiFePO4</code>, con absorción alrededor de
+        <strong>14,4–14,6 V</strong> y sin ecualización.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== MASAS ===================== -->
+  <section id="masas">
+    <h2>Masas en estrella <span class="step">no en cadena</span></h2>
+
+    <p>
+      Todas las masas vuelven <strong>al negativo de la batería</strong>, cada una
+      por su cable. No encadenes la masa de la Heltec a la de un ESC y esa al
+      siguiente.
+    </p>
+
+    <div class="warn">
+      <div class="title">Por qué importa aquí más que en otros montajes</div>
+      <p>
+        Dieciséis amperios por un tramo de cable compartido crean una caída de
+        tensión en esa masa. Si la Heltec cuelga aguas abajo de esa caída, su
+        cero deja de ser el mismo que el de los ESC — y todas sus referencias se
+        mueven con el empuje de los motores.
+      </p>
+      <p>
+        Lo notarías primero en el sensor de pH: la lectura se desplazaría al
+        navegar. Un fallo que parece del sensor y es del cableado.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== CONDENSADORES ===================== -->
+  <section id="caps">
+    <h2>Condensadores <span class="step">cuatro sitios, tres motivos</span></h2>
+
+    <p>
+      Ninguno es obligatorio para que arranque en el banco. Todos lo son para que
+      funcione bien con la batería, los cables largos y los dos motores tirando a
+      la vez.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Dónde</th><th class="mono">Qué</th><th>Para qué</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>B+ / B− de cada ESC</td>
+            <td class="mono">1000 µF · 25 V</td>
+            <td>pico de arranque de los brushless</td>
+          </tr>
+          <tr>
+            <td>+12 V / GND del par de BTS7960</td>
+            <td class="mono">1000 µF · 25 V</td>
+            <td>arranque del sinfín cargado</td>
+          </tr>
+          <tr>
+            <td>Salida del buck, <strong>en el extremo de la Heltec</strong></td>
+            <td class="mono">100 µF + 0,1 µF</td>
+            <td>caída en el cable y ruido de conmutación</td>
+          </tr>
+          <tr>
+            <td>VCC / GND de cada sensor analógico</td>
+            <td class="mono">0,1 µF</td>
+            <td>ruido en la alimentación del sensor</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="block">
+      <h3>Los grandes: reserva de energía</h3>
+      <p>
+        Los electrolíticos de 1000 µF están para <strong>entregar corriente
+        durante microsegundos</strong>, mientras la batería y el cable reaccionan.
+        Un brushless arrancando pide su pico mucho más rápido de lo que un metro
+        de cable puede suministrarlo, y esa inductancia hace que la tensión se
+        hunda en el momento del arranque.
+      </p>
+      <p>
+        Por eso van <strong>pegados a la carga</strong>, no junto a la batería:
+        ahí el cable que importa es el que queda entre el condensador y el motor.
+        Puesto en el otro extremo no sirve de nada.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>El par del buck: en el extremo equivocado no hace su trabajo</h3>
+      <figure>
+        <svg viewBox="0 0 620 150" role="img" aria-label="Condensadores en la salida del buck, junto a la Heltec">
+          <rect class="box" x="14" y="30" width="130" height="66" rx="6"/>
+          <text x="79" y="56" text-anchor="middle" font-weight="600">Buck</text>
+          <text class="small" x="79" y="74" text-anchor="middle">5 V · junto a batería</text>
+
+          <rect class="box" x="452" y="30" width="154" height="66" rx="6"/>
+          <text x="529" y="56" text-anchor="middle" font-weight="600">Heltec V3</text>
+          <text class="small" x="529" y="74" text-anchor="middle">5 V · GND</text>
+
+          <path class="wire" stroke="var(--wire-red)" d="M144 48 H452"/>
+          <path class="wire" stroke="var(--wire-black)" d="M144 88 H452"/>
+          <text class="small" x="298" y="38" text-anchor="middle">cable largo</text>
+
+          <!-- 100 uF -->
+          <path class="wire" stroke="var(--accent)" d="M394 48 V60"/>
+          <path class="wire" stroke="var(--accent)" d="M380 60 H408"/>
+          <path class="wire" stroke="var(--accent)" d="M380 70 H408"/>
+          <path class="wire" stroke="var(--accent)" d="M394 70 V88"/>
+          <circle cx="394" cy="48" r="4" fill="var(--accent)"/>
+          <circle cx="394" cy="88" r="4" fill="var(--accent)"/>
+          <text class="small" x="394" y="112" text-anchor="middle" fill="var(--accent)">100 µF</text>
+
+          <!-- 0.1 uF -->
+          <path class="wire" stroke="var(--accent)" d="M434 48 V60"/>
+          <path class="wire" stroke="var(--accent)" d="M420 60 H448"/>
+          <path class="wire" stroke="var(--accent)" d="M420 70 H448"/>
+          <path class="wire" stroke="var(--accent)" d="M434 70 V88"/>
+          <circle cx="434" cy="48" r="4" fill="var(--accent)"/>
+          <circle cx="434" cy="88" r="4" fill="var(--accent)"/>
+          <text class="small" x="434" y="128" text-anchor="middle" fill="var(--accent)">0,1 µF</text>
+        </svg>
+        <figcaption>
+          Los dos van al final del cable, no a la salida del módulo. El buck ya
+          trae los suyos; lo que no puede compensar es el metro de cable que hay
+          después.
+        </figcaption>
+      </figure>
+      <p>
+        Son dos porque no hacen lo mismo. El <strong>electrolítico de 100 µF</strong>
+        cubre las variaciones lentas — la Heltec pega un tirón de corriente cada
+        vez que el LoRa transmite a 22 dBm. El <strong>cerámico de 0,1 µF</strong>
+        cubre las rápidas: un electrolítico tiene demasiada inductancia interna
+        para responder a la conmutación del buck.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Respeta la polaridad de los electrolíticos</div>
+      <p>
+        Los de 1000 µF y el de 100 µF tienen banda marcada: esa pata es el
+        <strong>negativo</strong>. Al revés se calientan y revientan, a veces con
+        retraso de minutos. Los cerámicos de 0,1 µF no tienen polaridad.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">La tensión del condensador no es la de tu circuito</div>
+      <p>
+        En un raíl de 12 V se pone <strong>25 V</strong>, no 16. El margen cubre
+        la batería a plena carga (14,6 V cargando) y las sobretensiones que
+        devuelve un motor al frenar. Un electrolítico trabajando cerca de su
+        límite envejece rápido.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== BUCK ===================== -->
+  <section id="buck">
+    <h2>El buck de la Heltec <span class="step">12 V → 5 V</span></h2>
+
+    <div class="block">
+      <h3>Cuál de los dos</h3>
+      <p>
+        El <strong>MP1584EN</strong> conmuta entre 340 kHz y 1,5 MHz; el
+        <strong>LM2596</strong> a 150 kHz. El del MP1584EN es más fácil de filtrar
+        con condensadores pequeños y cae más lejos de la banda que molesta al ADC.
+        Es el que elegiría para este montaje.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>Dónde conectarlo</h3>
+      <p>
+        Directo a los bornes de la batería, con cable corto y propio — no colgando
+        del mismo punto que los ESC. Así la caída de tensión de los propulsores no
+        llega a la entrada del buck.
+      </p>
+    </div>
+
+    <div class="warn">
+      <div class="title">Nunca USB y buck a la vez</div>
+      <p>
+        Alimentar la Heltec por los dos caminos simultáneamente enfrenta dos
+        fuentes en el mismo raíl. Y tiene una consecuencia práctica: cada vez que
+        quieras reflashear la unidad flotante habrá que desconectar el buck.
+        Prevé un conector o un interruptor, no cables soldados.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Cómo comprobar que el buck no ensucia los sensores</div>
+      <p>
+        Ya tienes el instrumento. Con la sonda de pH quieta en un vaso, la
+        dispersión de la lectura fue de <strong>0,09 pH</strong> alimentando por
+        USB. Repite la medida con el buck: si sube, el ruido de conmutación está
+        llegando al ADC y hay que filtrar. Es la misma técnica que usamos para
+        validar el filtro del pH.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Alimentadora acuícola · proyecto de titulación ESPOL · Mario Viteri y Joshua
+    Defilippi. Los consumos de los motores son los máximos del fabricante; el
+    reposo y el reparto diario son un supuesto de uso, no una medida. Vale la
+    pena medir el consumo real en reposo con una pinza antes de cerrar la
+    elección de batería.
+  </footer>
+
+</div>
