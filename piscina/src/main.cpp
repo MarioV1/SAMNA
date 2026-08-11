@@ -314,6 +314,8 @@ static void printPhHelp() {
   Serial.println(F("    sl <0-10> probar un nivel"));
   Serial.println(F("\n  propulsion:"));
   Serial.println(F("    ti        estado de los ESC"));
+  Serial.println(F("    tg <0-2>  nivel CONTINUO para localizar el pin con"));
+  Serial.println(F("              multimetro (1=babor 2=estribor). tg 9 sale"));
   Serial.println(F("    tp <pct>  empuje de trabajo, 0-100 %"));
   Serial.println(F("    tr <us/ms> velocidad de rampa (2.0 normal, 0.2 para"));
   Serial.println(F("              verla comoda en el osciloscopio)"));
@@ -413,6 +415,17 @@ static void handleLine(char *line) {
     } else {
       Serial.printf("  armando... faltan %lu ms\n", (unsigned long)t->armLeftMs);
     }
+    Serial.printf("  LEDC configurado a %lu Hz (babor) y %lu Hz (estribor)\n",
+                  (unsigned long)t->setupHzPort, (unsigned long)t->setupHzStbd);
+    if (t->setupHzPort == 0 || t->setupHzStbd == 0) {
+      Serial.println(F("  ERROR: un 0 aqui significa que el LEDC NO acepto la"));
+      Serial.println(F("  combinacion de frecuencia y resolucion. Ese pin no"));
+      Serial.println(F("  esta emitiendo nada."));
+    }
+    if (thrustersInPinTest()) {
+      Serial.println(F("  *** MODO IDENTIFICACION DE PINES ACTIVO ***"));
+      Serial.println(F("  Niveles continuos, SIN senal de servo. 'tg 9' para salir."));
+    }
     Serial.printf("  empuje %u %%   rampa %.1f us/ms\n",
                   thrustersThrottlePct(), thrustersRampTenths() / 10.0f);
     Serial.printf("  esperado en el osciloscopio: 50 Hz, periodo 20.0 ms\n"
@@ -442,6 +455,27 @@ static void handleLine(char *line) {
     return;
   }
 
+  if (strncmp(line, "tg", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
+    if (n == 9) {
+      thrustersEndPinTest();
+      Serial.printf("[THR] senal de servo restaurada. Rearmando %d ms.\n", ESC_ARM_MS);
+      return;
+    }
+    if (n < 0 || n > 2) {
+      Serial.println(F("[THR] tg 0=ambos a 0V  1=babor a 3.3V  2=estribor a 3.3V"));
+      Serial.println(F("      tg 9 = volver a la senal de servo"));
+      return;
+    }
+    thrustersPinTest((uint8_t)n);
+    Serial.printf("[THR] NIVEL CONTINUO: babor GPIO %d = %s, estribor GPIO %d = %s\n"
+                  "      Busca con el multimetro en continua, respecto a GND.\n"
+                  "      NO hay senal de servo mientras esto este activo.\n"
+                  "      'tg 9' para volver.\n",
+                  PIN_ESC_PORT, (n == 1) ? "3.3 V" : "0 V",
+                  PIN_ESC_STBD, (n == 2) ? "3.3 V" : "0 V");
+    return;
+  }
+
   if (strncmp(line, "tr", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
     if (v <= 0.0f || v > 50.0f) {
       Serial.println(F("[THR] rampa fuera de rango (0.1 a 50 us/ms)."));
@@ -459,6 +493,10 @@ static void handleLine(char *line) {
   if (strncmp(line, "tv", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
     if (n < 0 || n > 4) {
       Serial.println(F("[THR] 0=stop 1=adelante 2=atras 3=horario 4=antihorario"));
+      return;
+    }
+    if (thrustersInPinTest()) {
+      Serial.println(F("[THR] estas en modo identificacion de pines. 'tg 9' primero."));
       return;
     }
     if (!thrustersArmed()) {

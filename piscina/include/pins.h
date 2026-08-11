@@ -140,9 +140,32 @@
  * durante la subida entran en el promedio. */
 #define FEEDER_RAMP_MS      200
 
-/* --- ESC de propulsion: 50 Hz, 16 bits (timer 1) --- */
+/* --- ESC de propulsion: 50 Hz, 14 bits (timer 1) --- */
 #define ESC_PWM_FREQ_HZ     50
-#define ESC_PWM_RES_BITS    16
+
+/*
+ * 14 bits, NO 16.
+ *
+ * El LEDC del ESP32-S3 admite 14 bits de resolucion como maximo
+ * (SOC_LEDC_TIMER_BIT_WIDE_NUM = 14). El ESP32 clasico admite 20, y de ahi
+ * venia el 16 que estuvo aqui desde el paso 2.
+ *
+ * El fallo era SILENCIOSO: ledcSetup() rechaza la configuracion en su primera
+ * linea y devuelve 0, pero nadie miraba ese valor de retorno. Los pines de
+ * los ESC no emitieron nada durante todo el paso 7, y solo se vio al medir
+ * con osciloscopio — milivoltios de ruido donde debia haber un tren de
+ * pulsos.
+ */
+#define ESC_PWM_RES_BITS    14
+
+/*
+ * Guarda para que esto no vuelva a pasar en silencio. Si alguien sube la
+ * resolucion por encima de lo que el chip admite, no compila.
+ */
+static_assert(ESC_PWM_RES_BITS <= 14,
+              "El LEDC del ESP32-S3 no pasa de 14 bits: ledcSetup devolveria 0");
+static_assert(FEED_PWM_RES_BITS <= 14,
+              "El LEDC del ESP32-S3 no pasa de 14 bits: ledcSetup devolveria 0");
 
 #define LEDC_CH_ESC_PORT    2
 #define LEDC_CH_ESC_STBD    3
@@ -157,13 +180,20 @@
 
 /*
  * Conversion de microsegundos a cuentas de duty.
- * A 50 Hz el periodo es 20000 us y la escala completa de 16 bits son
- * 65536 cuentas, asi que el paso es 0.305 us — mejor resolucion que la
- * que da ESP32Servo.
  *
- * constexpr: los valores fijos (neutro, minimo, maximo) quedan plegados
- * en tiempo de compilacion, sin division en ejecucion.
+ * A 50 Hz el periodo son 20000 us y la escala completa de 14 bits son 16384
+ * cuentas, asi que el paso es 1.22 us. Sobre el recorrido util de 1000 a
+ * 2000 us eso deja unos 820 escalones: mas fino de lo que cualquier ESC
+ * resuelve.
+ *
+ * Se suma medio periodo antes de dividir para REDONDEAR en vez de truncar.
+ * Truncando, 1500 us caian en 1499.0 — un microsegundo de sesgo constante en
+ * el neutro, justo el punto que los ESC usan para armar.
+ *
+ * constexpr: los valores fijos (neutro, minimo, maximo) quedan plegados en
+ * tiempo de compilacion, sin division en ejecucion.
  */
 static constexpr uint32_t escMicrosToDuty(uint32_t micros) {
-  return (micros * (1UL << ESC_PWM_RES_BITS)) / (1000000UL / ESC_PWM_FREQ_HZ);
+  return (micros * (1UL << ESC_PWM_RES_BITS) + (1000000UL / ESC_PWM_FREQ_HZ) / 2)
+         / (1000000UL / ESC_PWM_FREQ_HZ);
 }

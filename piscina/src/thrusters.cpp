@@ -29,6 +29,9 @@ static uint32_t lastRampMs = 0;
 static NavCmd   curNav = NAV_STOP;
 static ThrStats stats;
 
+/* Modo de identificacion de pines: niveles continuos en vez de servo. */
+static bool     pinTest = false;
+
 /* ==================================================================
  *  Salida
  * ================================================================== */
@@ -103,8 +106,14 @@ void thrustersBegin() {
   pinMode(PIN_ESC_STBD, OUTPUT);
   digitalWrite(PIN_ESC_STBD, LOW);
 
-  ledcSetup(LEDC_CH_ESC_PORT, ESC_PWM_FREQ_HZ, ESC_PWM_RES_BITS);
-  ledcSetup(LEDC_CH_ESC_STBD, ESC_PWM_FREQ_HZ, ESC_PWM_RES_BITS);
+  /*
+   * ledcSetup devuelve la frecuencia REAL conseguida, o 0 si no pudo. No
+   * comprobarlo dejaba pasar en silencio el caso en que el temporizador no
+   * admite la combinacion de frecuencia y resolucion pedida — y el sintoma
+   * seria justo un pin que no conduce.
+   */
+  stats.setupHzPort = ledcSetup(LEDC_CH_ESC_PORT, ESC_PWM_FREQ_HZ, ESC_PWM_RES_BITS);
+  stats.setupHzStbd = ledcSetup(LEDC_CH_ESC_STBD, ESC_PWM_FREQ_HZ, ESC_PWM_RES_BITS);
   ledcAttachPin(PIN_ESC_PORT, LEDC_CH_ESC_PORT);
   ledcAttachPin(PIN_ESC_STBD, LEDC_CH_ESC_STBD);
 
@@ -132,6 +141,10 @@ void thrustersBegin() {
 
 void thrustersPoll() {
   const uint32_t now = millis();
+
+  if (pinTest) {
+    return;   /* niveles fijos: aqui no se toca nada */
+  }
 
   if (!armed) {
     if ((now - armStartMs) >= ESC_ARM_MS) {
@@ -219,6 +232,51 @@ void thrustersSetRampTenths(uint16_t tenths) {
 
 uint16_t thrustersRampTenths() {
   return rampTenths;
+}
+
+/* ==================================================================
+ *  Identificacion de pines
+ * ================================================================== */
+
+void thrustersPinTest(uint8_t which) {
+  pinTest = true;
+
+  /* Se sueltan los canales LEDC para poder gobernar los pines a mano. */
+  ledcDetachPin(PIN_ESC_PORT);
+  ledcDetachPin(PIN_ESC_STBD);
+  pinMode(PIN_ESC_PORT, OUTPUT);
+  pinMode(PIN_ESC_STBD, OUTPUT);
+
+  digitalWrite(PIN_ESC_PORT, (which == 1) ? HIGH : LOW);
+  digitalWrite(PIN_ESC_STBD, (which == 2) ? HIGH : LOW);
+}
+
+void thrustersEndPinTest() {
+  if (!pinTest) {
+    return;
+  }
+  pinTest = false;
+
+  ledcAttachPin(PIN_ESC_PORT, LEDC_CH_ESC_PORT);
+  ledcAttachPin(PIN_ESC_STBD, LEDC_CH_ESC_STBD);
+
+  /*
+   * Se vuelve a neutro y se REARMA. Durante la prueba de pines los ESC
+   * estuvieron sin señal valida, asi que hay que darles otra vez sus
+   * ESC_ARM_MS de neutro antes de aceptar navegacion.
+   */
+  writePort(ESC_US_NEUTRAL);
+  writeStbd(ESC_US_NEUTRAL);
+  portTarget = ESC_US_NEUTRAL;
+  stbdTarget = ESC_US_NEUTRAL;
+  curNav     = NAV_STOP;
+  armStartMs = millis();
+  armed      = false;
+  lastRampMs = millis();
+}
+
+bool thrustersInPinTest() {
+  return pinTest;
 }
 
 const ThrStats *thrustersStats() {

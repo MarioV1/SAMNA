@@ -88,7 +88,28 @@ uint8_t thrustersThrottlePct();
 void     thrustersSetRampTenths(uint16_t tenthsUsPerMs);
 uint16_t thrustersRampTenths();
 
+/*
+ * Modo de identificacion de pines.
+ *
+ * Saca un nivel CONTINUO en vez de la señal de servo, para poder encontrar
+ * cada pin con un multimetro. Buscar un pulso de 1.5 ms cada 20 ms con la
+ * punta a ciegas es dificil; un nivel de 3.3 V se localiza en dos segundos.
+ *
+ *   0  ambos a 0 V
+ *   1  babor a 3.3 V, estribor a 0 V
+ *   2  babor a 0 V, estribor a 3.3 V
+ *
+ * Mientras este activo NO hay señal de servo: un ESC conectado no armaria.
+ * Se sale con thrustersEndPinTest(), y tambien lo desactiva cualquier
+ * comando de navegacion.
+ */
+void thrustersPinTest(uint8_t which);
+void thrustersEndPinTest();
+bool thrustersInPinTest();
+
 typedef struct {
+  uint32_t setupHzPort;  /* frecuencia real que consiguio el LEDC   */
+  uint32_t setupHzStbd;
   bool     armed;
   uint32_t armLeftMs;    /* lo que falta de armado          */
   uint16_t portUs;       /* pulso actual de babor           */
