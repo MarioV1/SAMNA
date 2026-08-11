@@ -505,8 +505,19 @@ static void handleLine(char *line) {
     }
     thrustersSetNav((NavCmd)n);
     Serial.printf("[THR] %s. La senal llega con rampa, no de golpe.\n", navName(n));
-    Serial.println(F("      OJO: esto NO alimenta el deadman. Si no llega"));
-    Serial.println(F("      navegacion por LoRa, en 2 s volvera a neutro."));
+    if (n != 0) {
+      /*
+       * Aviso deliberadamente ruidoso. El deadman solo se arma con
+       * navegacion recibida por LoRa — la condicion navActive — asi que un
+       * comando de consola SE QUEDA puesto. Hace falta que sea asi para el
+       * banco: con la rampa lenta, una inversion dura mas que el deadman y
+       * no se podria observar. Pero un empuje que no caduca merece decirse.
+       */
+      Serial.println(F("      *** ESTO NO CADUCA ***"));
+      Serial.println(F("      El deadman solo lo alimenta la navegacion por"));
+      Serial.println(F("      LoRa. Un comando de consola se queda puesto"));
+      Serial.println(F("      hasta que mandes 'tv 0' o 'x'."));
+    }
     return;
   }
 
