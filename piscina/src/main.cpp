@@ -37,6 +37,108 @@ static bool     navActive = false;
 /* La dosificacion ya no se simula: la lleva actuators.{h,cpp} con motores
  * de verdad. Ver la secuencia del ciclo en actuators.h. */
 
+/* ==================================================================
+ *  Tarea de seguridad — paso 8
+ *
+ *  Una sola tarea, y solo esta, se saca del bucle: la que lleva el deadman
+ *  y la rampa de los propulsores.
+ *
+ *  POR QUE ESTA Y NO MAS. Medido en placa antes de tocar nada: el bucle
+ *  unico llegaba a 209 ms de peor iteracion, y ese bloqueo es integramente
+ *  el paquete LoRa en el aire — 185 ms — mas el serial. No es el caso de
+ *  Estacion, donde 624 ms contra un refresco de 500 era una rotura; aqui son
+ *  209 contra un deadman de 2000. Pero significa que el deadman podia
+ *  dispararse a los 2209 ms, y esa es la unica garantia de seguridad del
+ *  sistema.
+ *
+ *  Con la tarea a prioridad mayor que el bucle de Arduino, la radio ya no
+ *  puede retrasarla: el planificador la expropia.
+ *
+ *  El resto NO se parte. Sensores, dosificacion y consola no tienen
+ *  requisito temporal, y cada tarea nueva es superficie para errores de
+ *  concurrencia que este bucle hoy no tiene.
+ *
+ *  COMUNICACION POR COLA, como pide CLAUDE.md. El bucle no llama a
+ *  thrustersSetNav(): empuja la intencion a una cola y la tarea la aplica.
+ *  Asi hay un solo dueño del estado de los propulsores.
+ * ================================================================== */
+
+typedef struct {
+  uint8_t nav;
+  /*
+   * true si la orden viene del enlace LoRa y por tanto arma el deadman.
+   * Los comandos de consola ('tv') van con false: son herramienta de banco
+   * y tienen que poder sostenerse mas de 2 s para observar la rampa lenta
+   * con el osciloscopio.
+   */
+  bool    armsDeadman;
+} NavOrder;
+
+static QueueHandle_t qNav = NULL;
+
+/* La tarea no imprime: levanta la bandera y el bucle la cuenta. Asi Serial
+ * sigue teniendo un solo dueño y no hace falta un mutex. */
+static volatile bool     deadmanFired = false;
+
+/*
+ * Edad real del ultimo comando en el instante del disparo.
+ *
+ * Es LA medida del paso 8. Los sellos de tiempo del monitor llevan la
+ * latencia del puerto serie y no sirven para esto; este numero lo toma la
+ * propia tarea en el momento, y el sobrepaso sobre NAV_DEADMAN_MS es
+ * exactamente lo que la arquitectura tenia que reducir.
+ */
+static volatile uint32_t deadmanAgeMs  = 0;
+static volatile uint32_t deadmanWorst  = 0;
+
+static void taskSafety(void *arg) {
+  (void)arg;
+  bool navArmed = false;
+
+  for (;;) {
+    NavOrder o;
+    while (xQueueReceive(qNav, &o, 0) == pdTRUE) {
+      thrustersSetNav((NavCmd)o.nav);
+      navArmed = o.armsDeadman && (o.nav != NAV_STOP);
+    }
+
+    const uint32_t age = linkCmdAgeMs();
+    if (navArmed && age > NAV_DEADMAN_MS) {
+      navArmed = false;
+      deadmanAgeMs = age;
+      if (age > deadmanWorst) {
+        deadmanWorst = age;
+      }
+      /* Sin rampa: un deadman que tarda 300 ms en llegar a neutro no es un
+       * deadman. */
+      thrustersStopNow();
+      deadmanFired = true;
+    }
+
+    thrustersPoll();
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+}
+
+/*
+ * Termometro del bucle, antes de decidir nada sobre FreeRTOS.
+ *
+ * En Estacion se partio en tareas porque se MIDIO que Firebase bloqueaba
+ * hasta 624 ms contra un refresco de 500. Aqui no hay medida todavia, y
+ * partir sin ella seria ceremonia: cada tarea nueva es superficie para
+ * errores de concurrencia que este bucle hoy no tiene.
+ *
+ * Lo que de verdad importa medir es cuanto puede retrasarse el deadman: si
+ * una vuelta larga coincide con su vencimiento, los propulsores siguen
+ * empujando ese tiempo de mas sobre los 2000 ms nominales.
+ */
+#define LOOP_WARN_MS   100
+
+static uint32_t loopMaxMs   = 0;
+static uint32_t loopOver    = 0;
+static uint32_t loopIters   = 0;
+static uint32_t loopMaxAtMs = 0;   /* cuando ocurrio el peor caso */
+
 /* Estado de la radio, para poder reintentar sin colgar la placa. */
 static bool     radioReady     = false;
 static uint32_t lastRadioTryMs = 0;
@@ -126,6 +228,20 @@ void setup() {
     }
   }
 
+  /*
+   * La tarea de seguridad, al final del arranque y en el nucleo 1 con
+   * prioridad por encima del bucle de Arduino (que corre a 1). Asi el
+   * planificador la expropia sobre cualquier transmision LoRa en curso.
+   */
+  qNav = xQueueCreate(4, sizeof(NavOrder));
+  if (qNav == NULL) {
+    Serial.println(F("ERROR: sin memoria para la cola de navegacion"));
+    while (true) { delay(1000); }
+  }
+  xTaskCreatePinnedToCore(taskSafety, "safety", 3072, NULL, 3, NULL, 1);
+  Serial.println(F("Tarea de seguridad en marcha: deadman y rampa de ESC\n"
+                   "fuera del bucle, a prioridad alta.\n"));
+
   lastTlmMs = millis();
 }
 
@@ -177,7 +293,13 @@ static void handleCmd(const CmdPacket &cmd) {
   curGrams   = cmd.grams;
   curSprayer = cmd.sprayer;
   actuatorsSetSprayerLevel(curSprayer);
-  thrustersSetNav(curNav);
+
+  /* A la tarea de seguridad por cola. Esta orden SI arma el deadman: viene
+   * del enlace. */
+  {
+    NavOrder o = { (uint8_t)curNav, true };
+    xQueueSend(qNav, &o, 0);
+  }
   navActive = (curNav != NAV_STOP);
 
   /*
@@ -312,6 +434,18 @@ static void printPhHelp() {
   Serial.println(F("    sw        barrido automatico de duty"));
   Serial.println(F("    sm <duty> guardar ese minimo (0-255)"));
   Serial.println(F("    sl <0-10> probar un nivel"));
+  Serial.printf("\n--- bucle ----------------------------------------\n"
+                "  iteraciones      %lu\n"
+                "  peor iteracion   %lu ms   (aviso a partir de %d)\n"
+                "  por encima       %lu\n"
+                "  El deadman YA NO depende de esto: vive en taskSafety.\n"
+                "  peor sobrepaso del deadman: %lu ms sobre %d nominales\n"
+                "--------------------------------------------------\n",
+                (unsigned long)loopIters, (unsigned long)loopMaxMs,
+                LOOP_WARN_MS, (unsigned long)loopOver,
+                (unsigned long)(deadmanWorst ? deadmanWorst - NAV_DEADMAN_MS : 0),
+                NAV_DEADMAN_MS);
+
   Serial.println(F("\n  propulsion:"));
   Serial.println(F("    ti        estado de los ESC"));
   Serial.println(F("    tg <0-2>  nivel CONTINUO para localizar el pin con"));
@@ -503,7 +637,12 @@ static void handleLine(char *line) {
       Serial.println(F("[THR] los ESC aun no han armado. Espera."));
       return;
     }
-    thrustersSetNav((NavCmd)n);
+    /* armsDeadman = false: es herramienta de banco y debe poder sostenerse
+     * mas de 2 s para observar la rampa lenta con el osciloscopio. */
+    {
+      NavOrder o = { (uint8_t)n, false };
+      xQueueSend(qNav, &o, 0);
+    }
     Serial.printf("[THR] %s. La senal llega con rampa, no de golpe.\n", navName(n));
     if (n != 0) {
       /*
@@ -734,6 +873,8 @@ static void sendTelemetry() {
  * ------------------------------------------------------------------ */
 
 void loop() {
+  const uint32_t loopStart = millis();
+
   if (!radioReady) {
     radioRetry();
     return;
@@ -742,7 +883,8 @@ void loop() {
   linkPoll();
   sensorsPoll();
   actuatorsPoll();
-  thrustersPoll();
+  /* thrustersPoll() ya NO se llama aqui: es de taskSafety, y llamarlo desde
+   * dos sitios haria avanzar la rampa al doble de velocidad. */
   pollConsole();
 
   CmdPacket cmd;
@@ -795,17 +937,37 @@ void loop() {
    * comando, asi que al arrancar el enlace ya cuenta como caducado y la
    * navegacion no puede activarse sola.
    */
-  if (navActive && linkCmdAgeMs() > NAV_DEADMAN_MS) {
-    navActive = false;
-    curNav    = NAV_STOP;
-    /* Ya no es un mensaje: esto mueve hardware. Sin rampa a proposito — un
-     * deadman que se toma 300 ms en llegar a neutro no es un deadman. */
-    thrustersStopNow();
-    Serial.printf("[DEADMAN] sin comandos en %d ms -> ESC a neutro\n", NAV_DEADMAN_MS);
+  /*
+   * El deadman ya no vive aqui: lo lleva taskSafety, que no puede quedarse
+   * detras de una transmision LoRa. El bucle solo se entera y lo cuenta.
+   */
+  if (deadmanFired) {
+    deadmanFired = false;
+    navActive    = false;
+    curNav       = NAV_STOP;
+    Serial.printf("[DEADMAN] disparo con el comando a %lu ms de edad.\n"
+                  "          Nominal %d, sobrepaso %lu ms.\n",
+                  (unsigned long)deadmanAgeMs, NAV_DEADMAN_MS,
+                  (unsigned long)(deadmanAgeMs - NAV_DEADMAN_MS));
   }
 
   if ((millis() - lastTlmMs) >= TLM_PERIOD_MS) {
     lastTlmMs = millis();
     sendTelemetry();
+  }
+
+  const uint32_t dt = millis() - loopStart;
+  loopIters++;
+  if (dt >= LOOP_WARN_MS) {
+    loopOver++;
+  }
+  if (dt > loopMaxMs) {
+    loopMaxMs   = dt;
+    loopMaxAtMs = millis();
+    if (dt >= LOOP_WARN_MS) {
+      Serial.printf("[BUCLE] nuevo peor caso: %lu ms. El deadman podria "
+                    "retrasarse otro tanto sobre sus %d ms.\n",
+                    (unsigned long)dt, NAV_DEADMAN_MS);
+    }
   }
 }
