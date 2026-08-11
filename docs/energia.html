@@ -594,10 +594,104 @@
     <h2>Masas en estrella <span class="step">no en cadena</span></h2>
 
     <p>
-      Todas las masas vuelven <strong>al negativo de la batería</strong>, cada una
-      por su cable. No encadenes la masa de la Heltec a la de un ESC y esa al
-      siguiente.
+      En todo el sistema hay <strong>una sola tierra</strong>. No existe ningún
+      punto de aislamiento: el buck <code>LM2596</code>/<code>MP1584EN</code> es
+      <strong>no aislado</strong> — su masa de salida es la misma que la de
+      entrada — y no hay optoacopladores ni convertidores aislados en ninguna
+      parte. Los 12 V de potencia y los 3,3 V de la Heltec comparten el mismo
+      cero.
     </p>
+
+    <div class="block">
+      <h3>Tres cosas que dejan de funcionar sin masa común</h3>
+      <p>
+        No es una recomendación de buenas prácticas: sin masa común esto no
+        arranca.
+      </p>
+      <ul>
+        <li>
+          <strong>La señal de los ESC.</strong> El pulso de 1500 µs son 3,3 V
+          <em>respecto a algo</em>. Sin masa común el ESC no sabe respecto a qué,
+          y no arma.
+        </li>
+        <li>
+          <strong>El <code>RPWM</code> de los BTS7960.</strong> Igual: la entrada
+          del driver compara contra su propia masa.
+        </li>
+        <li>
+          <strong>Los sensores analógicos.</strong> El ADC mide contra su cero; si
+          el cero del sensor es otro, mide la diferencia entre masas además de la
+          señal.
+        </li>
+      </ul>
+    </div>
+
+    <p>
+      Pero <strong>una sola tierra no significa un solo cable</strong>. Es un
+      único <em>nodo</em> eléctrico, y la forma de llegar a él importa: todas las
+      masas vuelven al <strong>negativo de la batería</strong>, cada una por su
+      cable.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 620 210" role="img" aria-label="Masa en cadena frente a masa en estrella">
+        <!-- ---------- CADENA ---------- -->
+        <text x="14" y="20" font-weight="600" font-size="13" fill="var(--danger)">En cadena — no</text>
+
+        <rect class="box" x="14" y="34" width="54" height="30" rx="4"/>
+        <text class="small" x="41" y="53" text-anchor="middle">batería −</text>
+
+        <rect class="box" x="100" y="34" width="46" height="30" rx="4"/>
+        <text class="small" x="123" y="53" text-anchor="middle">ESC 1</text>
+
+        <rect class="box" x="178" y="34" width="46" height="30" rx="4"/>
+        <text class="small" x="201" y="53" text-anchor="middle">ESC 2</text>
+
+        <rect class="box" x="256" y="34" width="52" height="30" rx="4"/>
+        <text class="small" x="282" y="53" text-anchor="middle">Heltec</text>
+
+        <path class="wire" stroke="var(--danger)" d="M68 49 H100"/>
+        <path class="wire" stroke="var(--danger)" d="M146 49 H178"/>
+        <path class="wire" stroke="var(--danger)" d="M224 49 H256"/>
+
+        <text class="small" x="84"  y="78" text-anchor="middle" fill="var(--danger)">16 A</text>
+        <text class="small" x="162" y="78" text-anchor="middle" fill="var(--danger)">8 A</text>
+        <text class="small" x="240" y="78" text-anchor="middle" fill="var(--danger)">0 A</text>
+
+        <text class="small" x="330" y="45">la Heltec cuelga al final</text>
+        <text class="small" x="330" y="59">de toda la caída acumulada:</text>
+        <text class="small" x="330" y="73">su cero se mueve al acelerar</text>
+
+        <!-- ---------- ESTRELLA ---------- -->
+        <text x="14" y="118" font-weight="600" font-size="13" fill="var(--ok)">En estrella — sí</text>
+
+        <rect class="box" x="14" y="132" width="54" height="56" rx="4"/>
+        <text class="small" x="41" y="164" text-anchor="middle">batería −</text>
+
+        <circle cx="96" cy="160" r="5" fill="var(--ok)"/>
+        <path class="wire" stroke="var(--ok)" d="M68 160 H96"/>
+        <text class="small" x="96" y="200" text-anchor="middle" fill="var(--ok)">punto único</text>
+
+        <path class="wire" stroke="var(--ok)" d="M96 160 V136 H190"/>
+        <path class="wire" stroke="var(--ok)" d="M96 160 H190"/>
+        <path class="wire" stroke="var(--ok)" d="M96 160 V184 H190"/>
+
+        <rect class="box" x="190" y="122" width="52" height="26" rx="4"/>
+        <text class="small" x="216" y="139" text-anchor="middle">ESC 1</text>
+        <rect class="box" x="190" y="148" width="52" height="26" rx="4"/>
+        <text class="small" x="216" y="165" text-anchor="middle">ESC 2</text>
+        <rect class="box" x="190" y="174" width="52" height="26" rx="4"/>
+        <text class="small" x="216" y="191" text-anchor="middle">Heltec</text>
+
+        <text class="small" x="264" y="145">cada uno con su propio cable:</text>
+        <text class="small" x="264" y="159">la corriente de un motor no</text>
+        <text class="small" x="264" y="173">pasa por la masa de otro</text>
+      </svg>
+      <figcaption>
+        El mismo nodo eléctrico en los dos casos. Lo que cambia es por dónde va la
+        corriente de vuelta.
+      </figcaption>
+    </figure>
 
     <div class="warn">
       <div class="title">Por qué importa aquí más que en otros montajes</div>
@@ -610,6 +704,31 @@
       <p>
         Lo notarías primero en el sensor de pH: la lectura se desplazaría al
         navegar. Un fallo que parece del sensor y es del cableado.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">El USB añade una masa más</div>
+      <p>
+        Al conectar el portátil para flashear, la masa del PC entra en la red.
+        Es la segunda razón para no tener el buck y el USB a la vez, además de
+        enfrentar dos fuentes en el raíl de 5 V.
+      </p>
+    </div>
+
+    <div class="warn">
+      <div class="title">El agua es un camino de masa que no dibujaste</div>
+      <p>
+        El electrodo de referencia del pH está sumergido, y los propulsores
+        también. Cualquier fuga de corriente de un motor al agua atraviesa esa
+        agua, y la referencia del pH la ve como un desplazamiento de tensión.
+      </p>
+      <p>
+        Si al navegar el pH se te va y <strong>ya has hecho bien la estrella</strong>,
+        ese es el sospechoso — no el cableado. Se comprueba fácil: mide el pH con
+        los propulsores parados y luego con ellos girando, con la sonda quieta en
+        el mismo sitio. Es la misma técnica de dispersión que usaste para validar
+        la sonda con USB.
       </p>
     </div>
   </section>
