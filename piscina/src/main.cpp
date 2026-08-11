@@ -21,6 +21,7 @@
 #include "lora_link.h"
 #include "pins.h"
 #include "sensors.h"
+#include "thrusters.h"
 
 /* ------------------------------------------------------------------
  *  Estado del banco
@@ -97,6 +98,20 @@ void setup() {
     Serial.printf("m_punto = %.3f g/s\n", actuatorsRate());
   }
 
+  /*
+   * Los ESC ANTES que los sensores: el armado son 2 segundos de neutro
+   * sostenido, y cuanto antes empiece esa cuenta, antes esta el catamaran
+   * listo para responder.
+   */
+  thrustersBegin();
+  Serial.printf("ESC: babor GPIO %d, estribor GPIO %d. Armando %d ms a "
+                "%d us de neutro...\n",
+                PIN_ESC_PORT, PIN_ESC_STBD, ESC_ARM_MS, ESC_US_NEUTRAL);
+  Serial.printf("Empuje de trabajo %u %%  ->  %d us adelante / %d us atras\n",
+                thrustersThrottlePct(),
+                ESC_US_NEUTRAL + (500 * thrustersThrottlePct()) / 100,
+                ESC_US_NEUTRAL - (500 * thrustersThrottlePct()) / 100);
+
   sensorsBegin();
   {
     const TempStats *ts = sensorTempStats();
@@ -162,6 +177,7 @@ static void handleCmd(const CmdPacket &cmd) {
   curGrams   = cmd.grams;
   curSprayer = cmd.sprayer;
   actuatorsSetSprayerLevel(curSprayer);
+  thrustersSetNav(curNav);
   navActive = (curNav != NAV_STOP);
 
   /*
@@ -296,6 +312,11 @@ static void printPhHelp() {
   Serial.println(F("    sw        barrido automatico de duty"));
   Serial.println(F("    sm <duty> guardar ese minimo (0-255)"));
   Serial.println(F("    sl <0-10> probar un nivel"));
+  Serial.println(F("\n  propulsion:"));
+  Serial.println(F("    ti        estado de los ESC"));
+  Serial.println(F("    tp <pct>  empuje de trabajo, 0-100 %"));
+  Serial.println(F("    tv <0-4>  probar una direccion (0=stop 1=adel 2=atras"));
+  Serial.println(F("              3=horario 4=antihorario)"));
   Serial.println(F("\n    x         PARAR TODO"));
   Serial.println(F("    ?         volver a mostrar esto"));
   Serial.println(F("--------------------------------------------------\n"));
@@ -319,6 +340,7 @@ static void handleLine(char *line) {
   }
 
   float v = 0.0f;
+  int   n = 0;
   if (strncmp(line, "c1", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
     const float volts = sensorPhVolts();
     if (sensorPhCalOnePoint(v)) {
@@ -374,7 +396,57 @@ static void handleLine(char *line) {
 
   if (line[0] == 'x' || line[0] == 'X') {
     actuatorsStopAll();
-    Serial.println(F("[ACT] TODO PARADO."));
+    thrustersStopNow();
+    Serial.println(F("[ACT] TODO PARADO: sinfin, aspersor y ESC a neutro."));
+    return;
+  }
+
+  /* --- propulsion --- */
+
+  if (strncmp(line, "ti", 2) == 0) {
+    const ThrStats *t = thrustersStats();
+    Serial.println(F("\n--- propulsion -----------------------------------"));
+    if (t->armed) {
+      Serial.println(F("  ESC ARMADOS"));
+    } else {
+      Serial.printf("  armando... faltan %lu ms\n", (unsigned long)t->armLeftMs);
+    }
+    Serial.printf("  empuje %u %%\n", thrustersThrottlePct());
+    Serial.printf("  nav vigente: %s\n", navName(t->nav));
+    Serial.printf("  babor    %4u us  ->  %4u us\n", t->portUs, t->portTargetUs);
+    Serial.printf("  estribor %4u us  ->  %4u us\n", t->stbdUs, t->stbdTargetUs);
+    Serial.printf("  paradas forzadas: %lu\n", (unsigned long)t->stops);
+    Serial.println(F("  OJO: un ESC no da realimentacion. Esto dice que la"));
+    Serial.println(F("  senal es correcta, NO que el ESC haya armado."));
+    Serial.println(F("--------------------------------------------------\n"));
+    return;
+  }
+
+  if (strncmp(line, "tp", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
+    if (n < 0 || n > 100) {
+      Serial.println(F("[THR] porcentaje fuera de 0-100."));
+      return;
+    }
+    thrustersSetThrottlePct((uint8_t)n);
+    Serial.printf("[THR] empuje %d %% -> %d us adelante / %d us atras\n",
+                  n, ESC_US_NEUTRAL + (500 * n) / 100,
+                  ESC_US_NEUTRAL - (500 * n) / 100);
+    return;
+  }
+
+  if (strncmp(line, "tv", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
+    if (n < 0 || n > 4) {
+      Serial.println(F("[THR] 0=stop 1=adelante 2=atras 3=horario 4=antihorario"));
+      return;
+    }
+    if (!thrustersArmed()) {
+      Serial.println(F("[THR] los ESC aun no han armado. Espera."));
+      return;
+    }
+    thrustersSetNav((NavCmd)n);
+    Serial.printf("[THR] %s. La senal llega con rampa, no de golpe.\n", navName(n));
+    Serial.println(F("      OJO: esto NO alimenta el deadman. Si no llega"));
+    Serial.println(F("      navegacion por LoRa, en 2 s volvera a neutro."));
     return;
   }
 
@@ -436,7 +508,6 @@ static void handleLine(char *line) {
     return;
   }
 
-  int n = 0;
   if (strncmp(line, "sd", 2) == 0 && sscanf(line + 2, "%d", &n) == 1) {
     if (n < 0 || n > 255) {
       Serial.println(F("[ACT] duty fuera de 0-255."));
@@ -530,7 +601,7 @@ static void sendTelemetry() {
   if (navActive)       { tlm.status |= ST_NAV_ACTIVE; }
   if (!sensorTempOk()) { tlm.status |= ST_TEMP_FAULT; }
   if (!sensorPhOk())   { tlm.status |= ST_PH_FAULT; }
-  /* ST_ESC_ARMED se queda en 0: no hay ESC hasta el paso 7. */
+  if (thrustersArmed()) { tlm.status |= ST_ESC_ARMED; }
 
   const bool ok = linkSendTlm(&tlm);
   const LinkStats *s = linkStats();
@@ -600,6 +671,7 @@ void loop() {
   linkPoll();
   sensorsPoll();
   actuatorsPoll();
+  thrustersPoll();
   pollConsole();
 
   CmdPacket cmd;
@@ -655,6 +727,9 @@ void loop() {
   if (navActive && linkCmdAgeMs() > NAV_DEADMAN_MS) {
     navActive = false;
     curNav    = NAV_STOP;
+    /* Ya no es un mensaje: esto mueve hardware. Sin rampa a proposito — un
+     * deadman que se toma 300 ms en llegar a neutro no es un deadman. */
+    thrustersStopNow();
     Serial.printf("[DEADMAN] sin comandos en %d ms -> ESC a neutro\n", NAV_DEADMAN_MS);
   }
 
