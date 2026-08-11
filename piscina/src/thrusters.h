@@ -74,6 +74,20 @@ void thrustersStopNow();
 void    thrustersSetThrottlePct(uint8_t pct);
 uint8_t thrustersThrottlePct();
 
+/*
+ * Velocidad de la rampa, en us de pulso por ms. Se guarda en NVS.
+ *
+ * Existe sobre todo para el osciloscopio: a 2 us/ms una inversion completa
+ * son 300 ms, que a 50 Hz son solo 15 pulsos y cuesta capturarlos. Bajandolo
+ * a 0.2 la misma inversion dura 3 s y la rampa se ve como una envolvente
+ * comoda de medir.
+ *
+ * Se expresa en decimas de us por ms para no meter flotantes en NVS: 20 son
+ * 2.0 us/ms.
+ */
+void     thrustersSetRampTenths(uint16_t tenthsUsPerMs);
+uint16_t thrustersRampTenths();
+
 typedef struct {
   bool     armed;
   uint32_t armLeftMs;    /* lo que falta de armado          */

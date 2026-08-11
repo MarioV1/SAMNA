@@ -15,6 +15,7 @@
 static Preferences prefs;
 
 static uint8_t  throttlePct = THRUST_DEFAULT_PCT;
+static uint16_t rampTenths  = THRUST_RAMP_US_PER_MS * 10;
 
 static uint16_t portUs = ESC_US_NEUTRAL;
 static uint16_t stbdUs = ESC_US_NEUTRAL;
@@ -112,6 +113,10 @@ void thrustersBegin() {
   if (throttlePct > 100) {
     throttlePct = THRUST_DEFAULT_PCT;
   }
+  rampTenths = prefs.getUShort("ramp", THRUST_RAMP_US_PER_MS * 10);
+  if (rampTenths == 0) {
+    rampTenths = THRUST_RAMP_US_PER_MS * 10;
+  }
 
   /* Neutro sostenido: es lo que arma los ESC. */
   writePort(ESC_US_NEUTRAL);
@@ -146,9 +151,18 @@ void thrustersPoll() {
   }
   lastRampMs = now;
 
-  uint32_t step = dt * THRUST_RAMP_US_PER_MS;
+  /*
+   * Se acumulan decimas y solo se gasta la parte entera, para que una rampa
+   * lenta no se pierda por redondeo: a 0.2 us/ms, cada vuelta de 5 ms daria
+   * 1 decima, que truncada a us seria 0 y la señal no se moveria nunca.
+   */
+  static uint32_t tenthsAcc = 0;
+  tenthsAcc += dt * rampTenths;
+  uint32_t step = tenthsAcc / 10;
+  tenthsAcc -= step * 10;
+
   if (step > 500) {
-    step = 500;   /* un salto de bucle largo no se convierte en un salto de señal */
+    step = 500;   /* un salto de bucle largo no se convierte en un salto de senal */
   }
 
   const uint16_t p = approach(portUs, portTarget, (uint16_t)step);
@@ -193,6 +207,18 @@ void thrustersSetThrottlePct(uint8_t pct) {
 
 uint8_t thrustersThrottlePct() {
   return throttlePct;
+}
+
+void thrustersSetRampTenths(uint16_t tenths) {
+  if (tenths == 0) {
+    tenths = 1;   /* 0 dejaria la señal congelada para siempre */
+  }
+  rampTenths = tenths;
+  prefs.putUShort("ramp", rampTenths);
+}
+
+uint16_t thrustersRampTenths() {
+  return rampTenths;
 }
 
 const ThrStats *thrustersStats() {

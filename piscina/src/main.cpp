@@ -315,6 +315,8 @@ static void printPhHelp() {
   Serial.println(F("\n  propulsion:"));
   Serial.println(F("    ti        estado de los ESC"));
   Serial.println(F("    tp <pct>  empuje de trabajo, 0-100 %"));
+  Serial.println(F("    tr <us/ms> velocidad de rampa (2.0 normal, 0.2 para"));
+  Serial.println(F("              verla comoda en el osciloscopio)"));
   Serial.println(F("    tv <0-4>  probar una direccion (0=stop 1=adel 2=atras"));
   Serial.println(F("              3=horario 4=antihorario)"));
   Serial.println(F("\n    x         PARAR TODO"));
@@ -411,7 +413,13 @@ static void handleLine(char *line) {
     } else {
       Serial.printf("  armando... faltan %lu ms\n", (unsigned long)t->armLeftMs);
     }
-    Serial.printf("  empuje %u %%\n", thrustersThrottlePct());
+    Serial.printf("  empuje %u %%   rampa %.1f us/ms\n",
+                  thrustersThrottlePct(), thrustersRampTenths() / 10.0f);
+    Serial.printf("  esperado en el osciloscopio: 50 Hz, periodo 20.0 ms\n"
+                  "    neutro %d us | adelante %d us | atras %d us\n",
+                  ESC_US_NEUTRAL,
+                  ESC_US_NEUTRAL + (500 * thrustersThrottlePct()) / 100,
+                  ESC_US_NEUTRAL - (500 * thrustersThrottlePct()) / 100);
     Serial.printf("  nav vigente: %s\n", navName(t->nav));
     Serial.printf("  babor    %4u us  ->  %4u us\n", t->portUs, t->portTargetUs);
     Serial.printf("  estribor %4u us  ->  %4u us\n", t->stbdUs, t->stbdTargetUs);
@@ -431,6 +439,20 @@ static void handleLine(char *line) {
     Serial.printf("[THR] empuje %d %% -> %d us adelante / %d us atras\n",
                   n, ESC_US_NEUTRAL + (500 * n) / 100,
                   ESC_US_NEUTRAL - (500 * n) / 100);
+    return;
+  }
+
+  if (strncmp(line, "tr", 2) == 0 && sscanf(line + 2, "%f", &v) == 1) {
+    if (v <= 0.0f || v > 50.0f) {
+      Serial.println(F("[THR] rampa fuera de rango (0.1 a 50 us/ms)."));
+      return;
+    }
+    thrustersSetRampTenths((uint16_t)(v * 10.0f));
+    const float fullUs = 2.0f * (500.0f * thrustersThrottlePct() / 100.0f);
+    Serial.printf("[THR] rampa %.1f us/ms.\n"
+                  "      Una inversion completa (%.0f us) durara %.0f ms,\n"
+                  "      es decir unos %.0f pulsos a 50 Hz.\n",
+                  v, fullUs, fullUs / v, (fullUs / v) / 20.0f);
     return;
   }
 
