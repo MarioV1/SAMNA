@@ -48,7 +48,7 @@
 /* Red -> LoRa. Se manda solo cuando algo cambia. */
 typedef struct {
   uint8_t nav;
-  uint8_t grams;
+  uint16_t grams;
   uint8_t sprayer;
   uint8_t feed;    /* 1 = disparar un ciclo */
 } NetCmd;
@@ -92,7 +92,7 @@ static void logf(const char *fmt, ...) {
  * ================================================================== */
 
 static NavCmd   curNav     = NAV_STOP;
-static uint8_t  curGrams   = 60;   /* el nivel mas bajo que ofrece la app */
+static uint16_t curGrams   = 2500; /* el preset mas bajo que ofrece la app */
 static uint8_t  curSprayer = 5;    /* medio recorrido del aspersor, 0-10  */
 
 static bool     radioReady     = false;
@@ -118,7 +118,7 @@ static bool      lastFbReady   = false;
 
 /* Ultimo comando publicado por la tarea de red, para no repetir envios. */
 static NavCmd  fbLastNav     = NAV_STOP;
-static uint8_t fbLastGrams   = 0;
+static uint16_t fbLastGrams  = 0;
 static uint8_t fbLastSprayer = 0;
 static bool    fbEverApplied = false;
 
@@ -142,7 +142,7 @@ static void printHelp() {
        "  w / s     adelante / atras\n"
        "  d / a     giro horario / antihorario\n"
        "  x         parar\n"
-       "  + / -     racion +-10 g  (clave /pwm, son gramos)\n"
+       "  + / -     racion +-250 g (clave /pwm, son gramos)\n"
        "  , / .     aspersor -+1   (clave /aspersor, nivel 0-10)\n"
        "  f         alimentar (con ACK y reintentos)\n"
        "  i         estadisticas del enlace\n"
@@ -529,8 +529,13 @@ static void handleKey(char c) {
     case 'a': case 'A': curNav = NAV_CCW;     pushCmd(false); break;
     case 'x': case 'X': curNav = NAV_STOP;    pushCmd(false); break;
 
-    case '+': curGrams = (curGrams >= 100) ? 100 : (uint8_t)(curGrams + 10); pushCmd(false); break;
-    case '-': curGrams = (curGrams <= 10)  ? 0   : (uint8_t)(curGrams - 10); pushCmd(false); break;
+    /* Escalones de 250 g: con raciones de kilos, subir de 10 en 10 exigiria
+     * 600 pulsaciones para recorrer el rango. */
+    case '+': curGrams = (curGrams + 250 > GRAMS_MAX) ? GRAMS_MAX
+                                                     : (uint16_t)(curGrams + 250);
+              pushCmd(false); break;
+    case '-': curGrams = (curGrams <= 250) ? 0 : (uint16_t)(curGrams - 250);
+              pushCmd(false); break;
 
     case '.': curSprayer = (curSprayer >= SPRAYER_LEVEL_MAX)
                              ? SPRAYER_LEVEL_MAX : (uint8_t)(curSprayer + 1);

@@ -43,7 +43,7 @@ static uint32_t   lastTxMs = 0;   /* fin de la ultima transmision, de cualquier 
 
 /* Comando vigente: lo que se manda en cada envio, con o sin feed. */
 static NavCmd     curNav     = NAV_STOP;
-static uint8_t    curGrams   = 0;
+static uint16_t   curGrams   = 0;
 static uint8_t    curSprayer = 0;
 
 /* Telemetria: buzon de un solo hueco. */
@@ -179,9 +179,9 @@ bool linkSendAbort() {
   return any;
 }
 
-void linkSetNav(NavCmd nav, uint8_t grams, uint8_t sprayer) {
+void linkSetNav(NavCmd nav, uint16_t grams, uint8_t sprayer) {
   curNav     = nav;
-  curGrams   = (grams > 100) ? 100 : grams;
+  curGrams   = (grams > GRAMS_MAX) ? GRAMS_MAX : grams;
   curSprayer = (sprayer > SPRAYER_LEVEL_MAX) ? SPRAYER_LEVEL_MAX : sprayer;
 }
 

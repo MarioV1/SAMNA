@@ -162,7 +162,7 @@ void actuatorsBegin() {
  *  Ciclo de dosificacion
  * ================================================================== */
 
-DoseResult actuatorsStartDose(uint8_t grams) {
+DoseResult actuatorsStartDose(uint16_t grams) {
   if (state != DOSE_IDLE || calRun || sweeping) {
     stats.rejected++;
     return DOSE_ERR_BUSY;
@@ -309,9 +309,12 @@ void actuatorsPoll() {
     case DOSE_RUNNING: {
       const uint32_t elapsed = now - augerStart;
 
-      /* La guarda es un vigilante, no el limite normal: si salta, algo se
-       * quedo colgado y hay que enterarse. */
-      if (elapsed >= MAX_DOSE_MS) {
+      /*
+       * Vigilante contra el t_on planificado, no contra el techo absoluto.
+       * Con dosis de kilos un ciclo dura minutos, asi que comparar contra
+       * MAX_DOSE_MS tardaria minutos en notar que esto se quedo colgado.
+       */
+      if (elapsed >= onMs + DOSE_GUARD_MARGIN_MS) {
         stats.guardTrips++;
         augerWrite(0);
         stateMs = now;

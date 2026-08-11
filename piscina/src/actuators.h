@@ -39,13 +39,29 @@
 #include "protocol.h"
 
 /*
- * Guarda de seguridad: ningun ciclo puede pasar de aqui, pase lo que pase.
+ * Techo absoluto de un ciclo. Se rechaza cualquier dosis que lo excediera.
  *
- * Es un vigilante, no un limite de dosificacion. A un caudal razonable los
- * 100 g que admite el paquete salen en mucho menos, asi que esto solo salta
- * si el sinfin se atasca o si la maquina de estados se queda colgada.
+ * Con GRAMS_MAX = 6000 g y m_punto = 32.5 g/s, la racion mayor son 185 s.
+ * Cuatro minutos dejan margen para un caudal algo menor sin bloquear una
+ * peticion legitima.
  */
-#define MAX_DOSE_MS       60000
+#define MAX_DOSE_MS       240000
+
+/*
+ * Margen del vigilante en marcha.
+ *
+ * La guarda NO compara contra MAX_DOSE_MS mientras el sinfin gira, sino
+ * contra el t_on planificado mas este margen. La diferencia importa: con
+ * dosis de kilos, un ciclo legitimo dura minutos, asi que un tope absoluto
+ * de cuatro minutos tardaria eso en detectar que la maquina de estados se
+ * quedo colgada. Comparando contra lo planificado, se detecta a los cinco
+ * segundos de pasarse.
+ *
+ * Lo que esto NO detecta es un sinfin atascado: seguiria girando su tiempo
+ * completo. Para eso haria falta leer la corriente por los pines IS del
+ * BTS7960, que hoy no estan cableados.
+ */
+#define DOSE_GUARD_MARGIN_MS   5000
 
 /* Pre-giro del aspersor antes de soltar comida, y cola despues de parar. */
 #define SPRAY_LEAD_MS     500
@@ -78,7 +94,7 @@ void actuatorsPoll();
  * de exito, que es el peor fallo posible en este sistema: silencioso y con
  * el camaron comiendo de menos.
  */
-DoseResult actuatorsStartDose(uint8_t grams);
+DoseResult actuatorsStartDose(uint16_t grams);
 
 bool      actuatorsBusy();
 DoseState actuatorsDoseState();

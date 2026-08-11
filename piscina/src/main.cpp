@@ -29,7 +29,7 @@
 static uint32_t lastTlmMs = 0;
 
 static NavCmd   curNav    = NAV_STOP;
-static uint8_t  curGrams  = 0;   /* masa objetivo del proximo ciclo */
+static uint16_t curGrams  = 0;   /* masa objetivo del proximo ciclo, en gramos */
 static uint8_t  curSprayer = 0;  /* nivel del aspersor, 0-10 — se usa en el paso 6 */
 static bool     navActive = false;
 

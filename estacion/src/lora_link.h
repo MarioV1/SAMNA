@@ -57,7 +57,7 @@ void linkPoll();
  *
  * Ambos se recortan a su rango, que es tambien el que valida la app.
  */
-void linkSetNav(NavCmd nav, uint8_t grams, uint8_t sprayer);
+void linkSetNav(NavCmd nav, uint16_t grams, uint8_t sprayer);
 
 /*
  * Manda el comando vigente con feed=0. Dispara y olvida: la navegacion no

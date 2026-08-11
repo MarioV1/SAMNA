@@ -135,10 +135,27 @@ enum FeedCmd : uint8_t {
   FEED_ABORT = 2,
 };
 
+/*
+ * Masa maxima por ciclo. La fija la app: KG_MAX = 6 kg.
+ *
+ * Si algun dia sube ahi, hay que subirla aqui — y comprobar MAX_DOSE_MS,
+ * porque a 32.5 g/s seis kilos ya son mas de tres minutos de sinfin.
+ */
+#define GRAMS_MAX   6000
+
 typedef struct __attribute__((packed)) {
   MsgHeader hdr;
   uint8_t   nav;      /* NavCmd */
-  uint8_t   grams;    /* masa objetivo del ciclo, 0-100 g */
+  /*
+   * Masa objetivo del ciclo, en gramos. uint16 y no uint8, y esto costo un
+   * fallo real: la app paso a ofrecer raciones de 2.5 a 6 kg, y con un byte
+   * Estacion recortaba 2500 a 100. Pedias 2.5 kg, salian ~100 g, y el
+   * sistema respondia ACK_OK. Un deficit de 25 veces, silencioso.
+   *
+   * El paquete crece de 10 a 11 B por esto. A SF9 son ~5 ms mas de aire:
+   * nada frente a poder expresar lo que el sistema hace de verdad.
+   */
+  uint16_t  grams;
   uint8_t   feed;     /* FeedCmd */
   uint8_t   sprayer;  /* velocidad del aspersor, nivel 0-10 */
 } CmdPacket;
@@ -258,14 +275,14 @@ typedef struct __attribute__((packed)) {
  * ================================================================== */
 
 static_assert(sizeof(MsgHeader) == 6,  "MsgHeader debe medir 6 bytes");
-static_assert(sizeof(CmdPacket) == 10, "CmdPacket debe medir 10 bytes");
+static_assert(sizeof(CmdPacket) == 11, "CmdPacket debe medir 11 bytes");
 static_assert(sizeof(TlmPacket) == 18, "TlmPacket debe medir 18 bytes");
 static_assert(sizeof(AckPacket) == 10, "AckPacket debe medir 10 bytes");
 
 /*
- * AckPacket y CmdPacket miden lo mismo, pero no se confunden: viajan en
- * sentidos opuestos y el campo `type` de la cabecera los separa. Aun asi
- * protoValidate() exige tipo Y longitud, nunca solo la longitud.
+ * protoValidate() exige tipo Y longitud, nunca solo la longitud: dos
+ * mensajes distintos pueden acabar midiendo lo mismo con cualquier cambio
+ * futuro, y entonces la longitud sola dejaria pasar un paquete por otro.
  */
 
 /* ==================================================================

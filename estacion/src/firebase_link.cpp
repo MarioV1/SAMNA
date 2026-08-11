@@ -149,10 +149,15 @@ static void applyTree(FirebaseJson *json) {
   }
 
   if (json->get(r, "pwm")) {
+    /*
+     * Gramos, hasta GRAMS_MAX. El recorte estaba en 100 de cuando la app
+     * ofrecia raciones en gramos: al pasar a kilos, un 2500 se convertia en
+     * 100 y el sistema entregaba 25 veces menos informando de exito.
+     */
     int v = r.intValue;
-    if (v < 0)   { v = 0; }
-    if (v > 100) { v = 100; }
-    cmds.grams = (uint8_t)v;
+    if (v < 0)          { v = 0; }
+    if (v > GRAMS_MAX)  { v = GRAMS_MAX; }
+    cmds.grams = (uint16_t)v;
   }
 
   if (json->get(r, "aspersor")) {

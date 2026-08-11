@@ -36,7 +36,7 @@
 /* Estado de los comandos, tal y como estan en la base ahora mismo. */
 typedef struct {
   NavCmd  nav;       /* resuelto desde las cuatro banderas    */
-  uint8_t grams;     /* /pwm, 0-100                           */
+  uint16_t grams;    /* /pwm, en gramos, hasta GRAMS_MAX        */
   uint8_t sprayer;   /* /aspersor, 0-10                       */
   bool    feed;      /* /motores, ya consumido si estaba true */
 } FbCommands;
