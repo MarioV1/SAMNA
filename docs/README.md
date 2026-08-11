@@ -5,6 +5,7 @@ se abren con doble clic en cualquier navegador, sin servidor ni dependencias.
 
 | Archivo | Qué contiene |
 |---|---|
+| `setup.md` | Montar el proyecto en otra computadora: qué archivo llevar, qué no copiar y dónde vive de verdad la calibración. |
 | `esquemas.html` | Cableado del MAX4466, filtro del pH y ESC de propulsión. Cada bloque en dos versiones: **mínima** para probar en el banco y **definitiva** con condensadores de desacoplo. |
 | `energia.html` | Alimentación de la unidad flotante: picos de corriente, criterio para elegir la batería y el BMS, masas en estrella, condensadores y el buck de la Heltec. |
 

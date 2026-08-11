@@ -46,7 +46,12 @@ multi-raíz hace que PlatformIO reconozca los dos proyectos por separado.
 cp estacion/include/secrets.h.example estacion/include/secrets.h
 ```
 
-Rellenar WiFi y Firebase. `secrets.h` está en `.gitignore`; nunca se sube.
+Rellenar `AP_PASSWORD` y `FIREBASE_AUTH`. Las credenciales **WiFi no van aquí**:
+se aprovisionan desde el móvil por el portal SoftAP y viven en la NVS de la
+Estacion. `secrets.h` está en `.gitignore`; nunca se sube.
+
+Para montar el proyecto en una máquina nueva —qué llevar y qué no— ver
+[`docs/setup.md`](docs/setup.md).
 
 **4. Compilar**
 
@@ -66,7 +71,12 @@ Para obtener `ṁ`:
 1. Correr el sinfín 10 s al 100 % descargando sobre una balanza.
 2. Pesar lo dosificado y dividir entre 10 → g/s.
 3. Repetir 3 veces y promediar.
-4. Escribir el valor en la constante correspondiente del firmware.
+4. Guardarlo por serial: `ar <ms>` corre el sinfín ese tiempo con la rampa
+   real, `ag <g>` le dice cuánto pesó lo que salió y calcula `ṁ`, y `am <g/s>`
+   lo fija a mano si se midió fuera.
+
+El valor queda en la **NVS de Piscina**, no en una constante compilada:
+sobrevive a un reflasheo y no depende de la máquina desde la que se compile.
 
 Usar la misma rampa de arranque de ~200 ms que el firmware de producción: los
 gramos que salen durante la rampa entran en el promedio, y calibrar con un
