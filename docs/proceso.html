@@ -1,0 +1,898 @@
+<title>Alimentadora — proceso de diseño e implementación</title>
+
+<style>
+  :root {
+    --ground:  #F6F7F8;
+    --surface: #FFFFFF;
+    --sunk:    #EDEFF2;
+    --line:    #DCE0E6;
+    --ink:     #191E25;
+    --muted:   #5B6573;
+    --accent:  #B4740F;
+    --accent-soft: #FBF1DE;
+    --danger:  #B3392B;
+    --danger-soft: #FBEAE7;
+    --ok:      #226D5D;
+    --ok-soft: #E4F1EE;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1319;
+      --surface: #161B22;
+      --sunk:    #1C222B;
+      --line:    #2A313B;
+      --ink:     #E3E7ED;
+      --muted:   #909BA9;
+      --accent:  #E0A33C;
+      --accent-soft: #2A2113;
+      --danger:  #EE6C59;
+      --danger-soft: #2E1815;
+      --ok:      #55B79F;
+      --ok-soft: #14231F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #0F1319;
+    --surface: #161B22;
+    --sunk:    #1C222B;
+    --line:    #2A313B;
+    --ink:     #E3E7ED;
+    --muted:   #909BA9;
+    --accent:  #E0A33C;
+    --accent-soft: #2A2113;
+    --danger:  #EE6C59;
+    --danger-soft: #2E1815;
+    --ok:      #55B79F;
+    --ok-soft: #14231F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 22px 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 38px);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  nav.jump { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+  nav.jump a {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 11px;
+  }
+  nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+  nav.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  h2 {
+    margin: 0;
+    font-size: 23px;
+    font-weight: 640;
+    letter-spacing: -0.015em;
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--accent);
+  }
+  h2 .step {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-left: 10px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  p { margin: 0; max-width: 66ch; }
+  .block { display: flex; flex-direction: column; gap: 10px; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    background: var(--sunk);
+    white-space: nowrap;
+  }
+  td.mono, th.mono {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  tr.phase td {
+    background: var(--sunk);
+    font-weight: 650;
+    font-size: 14px;
+  }
+  tr.phase td .date {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 10px;
+  }
+
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    border-radius: 3px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  .pill.done    { background: var(--ok-soft);     color: var(--ok); }
+  .pill.pend    { background: var(--accent-soft); color: var(--accent); }
+  .pill.bench   { background: var(--sunk);        color: var(--muted); }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: var(--sunk);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  .warn, .note, .pending {
+    display: flex; flex-direction: column; gap: 7px;
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .warn   { background: var(--danger-soft); border-left: 3px solid var(--danger); }
+  .note   { background: var(--ok-soft);     border-left: 3px solid var(--ok); }
+  .pending{ background: var(--accent-soft); border-left: 3px solid var(--accent); }
+  .warn .title    { font-weight: 650; font-size: 14.5px; color: var(--danger); }
+  .note .title    { font-weight: 650; font-size: 14.5px; color: var(--ok); }
+  .pending .title { font-weight: 650; font-size: 14.5px; color: var(--accent); }
+  .warn p, .note p, .pending p { font-size: 14.5px; max-width: 62ch; }
+
+  ul { margin: 0; padding-left: 20px; max-width: 64ch; }
+  li { margin-bottom: 5px; }
+  li:last-child { margin-bottom: 0; }
+
+  .big { display: flex; flex-wrap: wrap; gap: 10px; }
+  .stat {
+    flex: 1 1 160px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .stat .n {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 26px; font-weight: 600; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .k { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  .stat.good  .n { color: var(--ok); }
+  .stat.alarm .n { color: var(--danger); }
+
+  /* ---- carril de fases ---- */
+  .rail { display: flex; flex-direction: column; gap: 0; }
+  .rail .ph {
+    display: grid;
+    grid-template-columns: 76px 1fr;
+    gap: 16px;
+    padding: 0 0 18px 0;
+    position: relative;
+  }
+  .rail .ph::before {
+    content: "";
+    position: absolute;
+    left: 87px; top: 22px; bottom: -4px;
+    width: 2px;
+    background: var(--line);
+  }
+  .rail .ph:last-child::before { display: none; }
+  .rail .num {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    padding-top: 2px;
+  }
+  .rail .dot {
+    position: absolute;
+    left: 82px; top: 8px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--ground);
+  }
+  .rail .ph.pending .dot { background: var(--line); }
+  .rail .body { display: flex; flex-direction: column; gap: 3px; padding-left: 18px; }
+  .rail .t { font-weight: 620; font-size: 15px; }
+  .rail .d { font-size: 13.5px; color: var(--muted); max-width: 58ch; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 28px 16px 60px; gap: 32px; }
+    .rail .ph { grid-template-columns: 44px 1fr; }
+    .rail .ph::before { left: 55px; }
+    .rail .dot { left: 50px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Alimentadora acuícola · ESPOL</div>
+    <h1>Proceso de diseño e implementación</h1>
+    <p class="lede">
+      Cómo se construyó el sistema: el método, los ocho pasos con sus sub‑pasos,
+      qué se midió para verificar cada uno y los trece fallos que costaron
+      tiempo. Del 7 al 10 de agosto de 2026.
+    </p>
+    <nav class="jump">
+      <a href="#metodo">Método</a>
+      <a href="#pasos">Los ocho pasos</a>
+      <a href="#tabla">Tabla completa</a>
+      <a href="#medido">Lo que se midió</a>
+      <a href="#fallos">Los trece fallos</a>
+      <a href="#giros">Decisiones que giraron</a>
+      <a href="#estado">Estado final</a>
+    </nav>
+  </header>
+
+  <!-- ===================== MÉTODO ===================== -->
+  <section id="metodo">
+    <h2>Método <span class="step">tres reglas, sostenidas</span></h2>
+
+    <p>
+      El plan no fue una lista de tareas sino un procedimiento. Tres reglas, que
+      no se rompieron ni cuando habría sido más cómodo:
+    </p>
+
+    <div class="block">
+      <h3>1 · Un paso a la vez, con autorización explícita</h3>
+      <p>
+        Ningún paso empezó sin que el anterior estuviera cerrado y aprobado. No
+        es burocracia: cada paso dejó un sistema <strong>compilable y probable
+        por separado</strong>, así que cuando algo se rompía, el culpable estaba
+        entre lo que se acababa de tocar y no entre ocho subsistemas nuevos.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>2 · Verificar en hardware, no en compilación</h3>
+      <p>
+        «Compila» no cerró ningún paso. Cerró el osciloscopio, la balanza, el
+        multímetro o la app enviando un comando real. Fue lo que salvó el paso 7:
+        el firmware de los ESC compilaba perfecto y no emitía <em>nada</em>.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>3 · Medir antes de decidir</h3>
+      <p>
+        Las decisiones de arquitectura salieron de números, no de intuición. La
+        partición en tareas de FreeRTOS no se hizo «porque es lo correcto»: se
+        midió que Firebase bloqueaba <strong>624 ms</strong> contra un refresco
+        de navegación de <strong>500 ms</strong>. En Piscina se midió primero
+        también, y por eso solo se partió el camino de seguridad en vez de
+        reescribirlo todo.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">La consecuencia menos obvia</div>
+      <p>
+        Medir antes también evita trabajo. En Piscina la medición dijo que el
+        bucle único aguantaba salvo en el camino crítico, así que se partió
+        <strong>una sola tarea</strong> y no cuatro. El resultado fue mejor y el
+        cambio, más pequeño.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== LOS OCHO PASOS ===================== -->
+  <section id="pasos">
+    <h2>Los ocho pasos <span class="step">del 7 al 10 de agosto</span></h2>
+
+    <div class="rail">
+      <div class="ph">
+        <div class="num">07 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">1 · Scaffold del repositorio</div>
+          <div class="d">Dos proyectos PlatformIO separados más <code>shared/</code>. Versiones fijadas y credenciales fuera de git desde el primer commit.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">07 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">2 · Asignación de GPIO</div>
+          <div class="d">Pinout de ambas placas verificado contra la documentación oficial del Heltec V3. Aquí quedaron dos errores latentes que no explotaron hasta los pasos 4 y 7.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">08 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">3 · Enlace LoRa bidireccional</div>
+          <div class="d">Contrato binario, telemetría, comandos con ACK y reintentos, y el deadman de navegación. Cuatro sub‑pasos.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">08 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">4 · WiFi y Firebase en Estacion</div>
+          <div class="d">Portal de aprovisionamiento desde el móvil, lectura de comandos y escritura de telemetría. El paso que más se torció.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">09 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">5 · Sensores, uno a uno</div>
+          <div class="d">DS18B20 y pH cerrados con sensores reales. El MAX4466 quedó programado sin probar: no había llegado.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">10 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">6 · Actuadores de alimentación</div>
+          <div class="d">Dosificador calibrado con comida y balanza, aspersor mapeado a metros, y el PARO como camino propio.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">10 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">7 · Propulsión con ESC</div>
+          <div class="d">Armado, mezcla diferencial y rampa. Verificado con osciloscopio porque los motores estaban en el laboratorio.</div>
+        </div>
+      </div>
+      <div class="ph">
+        <div class="num">10 ago</div><div class="dot"></div>
+        <div class="body">
+          <div class="t">8 · Integración FreeRTOS</div>
+          <div class="d">Tarea de seguridad en Piscina. El deadman pasó de 209 ms de sobrepaso posible a 5 ms medidos.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TABLA COMPLETA ===================== -->
+  <section id="tabla">
+    <h2>Tabla completa <span class="step">pasos y sub‑pasos</span></h2>
+
+    <p>
+      Cada sub‑paso es una unidad cerrada: se construyó, se verificó con un
+      instrumento concreto y quedó en su propio commit. La columna de
+      verificación es la que importa — sin ella la fila es una intención, no un
+      resultado.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="mono">Sub</th>
+            <th>Qué se construyó</th>
+            <th>Cómo se verificó</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="phase"><td colspan="4">Paso 1 · Scaffold del repositorio<span class="date">07 ago</span></td></tr>
+          <tr>
+            <td class="mono">1a</td>
+            <td>Dos proyectos PlatformIO independientes y <code>shared/</code> incluido por ambos</td>
+            <td>Los dos compilan en vacío</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">1b</td>
+            <td><code>CLAUDE.md</code> como fuente de decisiones; <code>secrets.h</code> fuera de git</td>
+            <td><code>git status</code> no ve las credenciales</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">1c</td>
+            <td>Versión de plataforma y librerías fijadas</td>
+            <td>Build reproducible en otra máquina</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 2 · Asignación de GPIO<span class="date">07 ago</span></td></tr>
+          <tr>
+            <td class="mono">2a</td>
+            <td>Inventario de pines ocupados por la placa: radio, OLED, flash, JTAG, UART0</td>
+            <td>Contrastado con el pinout oficial y con <code>pins_arduino.h</code></td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">2b</td>
+            <td>Asignación por subsistema sobre el pool libre</td>
+            <td>Revisión de conflictos pin a pin</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">2c</td>
+            <td>Dos regímenes PWM en timers LEDC distintos: alimentación y ESC</td>
+            <td>Comprobado que los canales que comparten timer comparten frecuencia</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 3 · Enlace LoRa bidireccional<span class="date">08 ago</span></td></tr>
+          <tr>
+            <td class="mono">3a</td>
+            <td><code>protocol.h</code>: structs empaquetados, tamaños congelados con <code>static_assert</code>, CRC por hardware</td>
+            <td>Radio arriba en ambas placas; primer paquete recibido</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">3b</td>
+            <td>Telemetría Piscina → Estacion cada 2 s</td>
+            <td>Serial de Estacion mostrando paquetes con RSSI y SNR</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">3c</td>
+            <td>Comandos Estacion → Piscina con ACK, reintentos y rechazo por ciclo en curso</td>
+            <td>ACK observado; ciclo en curso devolviendo <code>ACK_BUSY</code></td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">3d</td>
+            <td>Navegación momentánea con deadman, y diagnóstico de enlace por serial</td>
+            <td>Deadman disparando a los 2000 ms con el enlace cortado</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 4 · WiFi y Firebase en Estacion<span class="date">08 ago</span></td></tr>
+          <tr>
+            <td class="mono">4a</td>
+            <td>WiFi no bloqueante, dos redes en NVS con promoción de la más reciente</td>
+            <td>Reconexión tras cortar el router</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">4b</td>
+            <td>Portal SoftAP de aprovisionamiento; prueba las credenciales antes de guardarlas</td>
+            <td>Credenciales introducidas desde el móvil, conexión establecida</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">4c</td>
+            <td>Lectura de comandos y reenvío por LoRa, incluida la clave <code>/aspersor</code></td>
+            <td>Escribiendo claves a mano en la consola de Firebase</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">4d</td>
+            <td>Escritura de telemetría en un único <em>multi‑path update</em></td>
+            <td>Valores apareciendo en la consola, sin claves basura</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">4e</td>
+            <td>Partición en tareas FreeRTOS — adelanto del paso 8 que obligaron los datos</td>
+            <td>Peor iteración de 624 ms a 157 ms, cero refrescos excedidos</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 5 · Sensores, uno a uno<span class="date">09 ago</span></td></tr>
+          <tr>
+            <td class="mono">5a</td>
+            <td>DS18B20 por 1‑Wire directo con Skip ROM, máquina de estados asíncrona, CRC del scratchpad</td>
+            <td>Temperatura real subiendo a Firebase</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">5b</td>
+            <td>Sonda de pH: divisor 1:2, promedio de 64 muestras, filtro exponencial, calibración en NVS</td>
+            <td>Agua de grifo y bicarbonato contra tiras reactivas</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">5c</td>
+            <td>MAX4466 — nivel de sonido como indicador de actividad de alimentación</td>
+            <td>—</td>
+            <td><span class="pill pend">pendiente</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 6 · Actuadores de alimentación<span class="date">10 ago</span></td></tr>
+          <tr>
+            <td class="mono">6a</td>
+            <td>Driver de dosificador y aspersor sobre BTS7960, con rampa de arranque y guarda de seguridad</td>
+            <td>Motores girando en banco, sentido comprobado en los dos sentidos</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">6b</td>
+            <td>Calibración de <code>ṁ</code> y compensación del déficit de rampa</td>
+            <td>Balanza: 60 g pedidos desde la app → <strong>59 g pesados</strong></td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">6c</td>
+            <td>Aspersor: niveles 0–10 anclados en el duty <em>útil</em>, mapeados a metros</td>
+            <td>Barrido de duty con el disco montado, observando el alcance</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">6d</td>
+            <td>PARO como camino propio: clave <code>/paro</code>, <code>FEED_ABORT</code>, aborto del ciclo en curso</td>
+            <td>Escrito a mano en Firebase y luego desde la app</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 7 · Propulsión con ESC<span class="date">10 ago</span></td></tr>
+          <tr>
+            <td class="mono">7a</td>
+            <td>Armado de 2 s en neutro, mezcla diferencial y rampa que acumula décimas de µs</td>
+            <td>Osciloscopio: 50 Hz, 1500 µs de neutro, dos pulsos iguales</td>
+            <td><span class="pill bench">falta motor</span></td>
+          </tr>
+          <tr>
+            <td class="mono">7b</td>
+            <td>Comandos de banco para localizar pines y verificar la rampa</td>
+            <td>Multímetro y osciloscopio</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">7c</td>
+            <td>Deadman de navegación extremo a extremo</td>
+            <td>App → Firebase → LoRa → ESC: <strong>2005 ms</strong> sobre 2000 nominales</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+
+          <tr class="phase"><td colspan="4">Paso 8 · Integración FreeRTOS<span class="date">10 ago</span></td></tr>
+          <tr>
+            <td class="mono">8a</td>
+            <td>Medición previa del bucle único de Piscina</td>
+            <td>4,47 M iteraciones, peor caso <strong>209 ms</strong></td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+          <tr>
+            <td class="mono">8b</td>
+            <td><code>taskSafety</code> en el núcleo 1 con prioridad alta, cola para las órdenes de navegación</td>
+            <td>Sobrepaso del deadman: <strong>1, 5 y 5 ms</strong> en tres ensayos</td>
+            <td><span class="pill done">cerrado</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <div class="title">Por qué 4e está fuera de sitio</div>
+      <p>
+        La partición en tareas pertenecía al paso 8, y aun así se hizo en el 4.
+        No fue un capricho: el dato dijo que el refresco de navegación ya se
+        estaba perdiendo, y dejarlo para el final habría significado construir
+        tres pasos encima de una base que se sabía rota. Es la única vez que se
+        adelantó trabajo, y quedó anotado como tal.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== LO QUE SE MIDIÓ ===================== -->
+  <section id="medido">
+    <h2>Lo que se midió <span class="step">números para la memoria</span></h2>
+
+    <div class="big">
+      <div class="stat good">
+        <div class="n">1,7 %</div>
+        <div class="k">error de dosificación: 59 g pesados de 60 pedidos</div>
+      </div>
+      <div class="stat good">
+        <div class="n">5 ms</div>
+        <div class="k">sobrepaso del deadman sobre 2000 nominales, tras partir la tarea</div>
+      </div>
+      <div class="stat">
+        <div class="n">2005 ms</div>
+        <div class="k">deadman extremo a extremo, con la cadena completa app → ESC</div>
+      </div>
+      <div class="stat">
+        <div class="n">32,5 g/s</div>
+        <div class="k">caudal del sinfín, promedio de 5 ensayos</div>
+      </div>
+      <div class="stat alarm">
+        <div class="n">17,5 %</div>
+        <div class="k">pérdida de enlace durante navegación, frente al ~16 % previsto antes de escribir código</div>
+      </div>
+      <div class="stat">
+        <div class="n">0,09 pH</div>
+        <div class="k">dispersión de la sonda quieta — la referencia contra la que comparar el buck</div>
+      </div>
+      <div class="stat">
+        <div class="n">209 → 5 ms</div>
+        <div class="k">peor latencia del camino de seguridad, antes y después del paso 8</div>
+      </div>
+      <div class="stat">
+        <div class="n">6 502</div>
+        <div class="k">líneas en 21 archivos; 3 405 de código y 2 239 de comentario</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <div class="title">La predicción que se cumplió</div>
+      <p>
+        Antes de escribir el código de navegación se estimó una pérdida de enlace
+        de alrededor del 16 % por el reparto de tiempo de la radio. Medida
+        después: <strong>17,5 %</strong>. Que el número previsto y el medido
+        coincidan es lo que convierte el modelo en algo defendible ante un
+        tribunal — y es la razón de que el deadman no sea opcional.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== LOS TRECE FALLOS ===================== -->
+  <section id="fallos">
+    <h2>Los trece fallos <span class="step">y cómo se encontraron</span></h2>
+
+    <p>
+      Ninguno se arregló adivinando. La columna de la derecha es la parte
+      transferible: casi todos se resolvieron <strong>reproduciendo el fallo de
+      forma determinista</strong> o <strong>eliminando causas una a una</strong>,
+      no leyendo código hasta que algo saltara a la vista.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="mono">#</th>
+            <th>Síntoma</th>
+            <th>Causa real</th>
+            <th>Cómo se encontró</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">1</td>
+            <td>Serial mudo; las placas parecían colgadas</td>
+            <td><code>ARDUINO_USB_CDC_ON_BOOT=1</code> mapeaba <code>Serial</code> al USB nativo, pero las placas usan un puente CP2102 sobre UART0</td>
+            <td>Mirando el VID/PID real con que enumeran: Silicon Labs, no Espressif</td>
+          </tr>
+          <tr>
+            <td class="mono">2</td>
+            <td>Ninguno — error latente</td>
+            <td>Sync word <code>0x34</code> documentada como privada; es la <em>pública</em> de LoRaWAN</td>
+            <td>Revisión del datasheet al documentar</td>
+          </tr>
+          <tr>
+            <td class="mono">3</td>
+            <td>Contador de paquetes perdidos disparado a 65 109</td>
+            <td>El cálculo de hueco de secuencia se envenenaba al reiniciarse el emisor</td>
+            <td>El propio número: imposible de física, delataba el desbordamiento</td>
+          </tr>
+          <tr>
+            <td class="mono">4</td>
+            <td>Estacion pisaba su propio ACK</td>
+            <td>El reloj de refresco de navegación contaba aparte y disparaba 200 ms después de una alimentación</td>
+            <td>Trazas de tiempo de transmisión en ambos lados</td>
+          </tr>
+          <tr>
+            <td class="mono">5</td>
+            <td>Una alimentación entera tragada en silencio</td>
+            <td>Reset de Estacion → la secuencia reinicia en 0 → Piscina lo tomó por duplicado</td>
+            <td>Reproducido de forma determinista reiniciando Estacion a propósito</td>
+          </tr>
+          <tr>
+            <td class="mono">6</td>
+            <td>Faltaban las últimas líneas de diagnóstico</td>
+            <td><code>logf</code> truncaba a 200 bytes sin avisar</td>
+            <td>Al notar que el corte caía siempre en la misma longitud</td>
+          </tr>
+          <tr>
+            <td class="mono">7</td>
+            <td>El stream de Firebase no entregaba ni un evento</td>
+            <td>Limitación de la librería en esa versión</td>
+            <td>Eliminación sistemática: memoria, timeouts, escrituras concurrentes, ritmo de sondeo, callback y ruta raíz contra sub‑ruta</td>
+          </tr>
+          <tr>
+            <td class="mono">8</td>
+            <td>El stream se caía 13 veces por minuto</td>
+            <td>Un <code>serverResponse</code> bajado a 3 s — cambio propio</td>
+            <td>Revirtiendo el único parámetro tocado</td>
+          </tr>
+          <tr>
+            <td class="mono">9</td>
+            <td>El DS18B20 no aparecía en el bus</td>
+            <td>El ROM de fábrica de la sonda tiene el CRC inválido</td>
+            <td>Dos protocolos 1‑Wire independientes devolviendo los mismos bytes: el bus estaba bien, el ROM no</td>
+          </tr>
+          <tr>
+            <td class="mono">10</td>
+            <td>Lecturas de pH imposibles</td>
+            <td>El módulo entrega 4 V a una entrada de 3,3 V; hacía falta divisor</td>
+            <td>Multímetro en la salida del módulo</td>
+          </tr>
+          <tr>
+            <td class="mono">11</td>
+            <td>Se pedían 2,5 kg y salían ~100 g, con <code>ACK_OK</code></td>
+            <td>El campo de gramos era <code>uint8_t</code>: 2500 se recortaba a 100</td>
+            <td>Mario notó que el tiempo de motor no cambiaba entre raciones</td>
+          </tr>
+          <tr>
+            <td class="mono">12</td>
+            <td>Los pines de los ESC no emitían nada</td>
+            <td>16 bits de resolución LEDC; el ESP32‑S3 no pasa de 14, y el error se devolvía sin que nadie lo mirara</td>
+            <td>Osciloscopio: milivoltios de ruido donde debía haber pulsos</td>
+          </tr>
+          <tr>
+            <td class="mono">13</td>
+            <td>Documentación que decía lo contrario del código</td>
+            <td>Afirmación mía incorrecta sobre la caducidad de un comando de banco</td>
+            <td>Releyendo el código al escribir la ayuda</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warn">
+      <div class="title">El patrón que comparten los peores</div>
+      <p>
+        Los fallos 5, 11 y 12 tienen la misma forma: <strong>el sistema
+        respondía que todo iba bien</strong>. Un <code>ACK_OK</code> sobre una
+        dosis 25 veces corta, una alimentación descartada como duplicada, una
+        configuración rechazada cuyo código de error nadie leía.
+      </p>
+      <p>
+        Un fallo ruidoso se arregla el día que aparece. Uno silencioso se
+        arregla el día que alguien pesa la comida. De ahí que el firmware acabara
+        con <code>static_assert</code> en los tamaños de paquete, comprobación de
+        los valores de retorno y marcado explícito de sensor no verificado: no
+        son adornos defensivos, son la respuesta a tres fallos concretos.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== GIROS ===================== -->
+  <section id="giros">
+    <h2>Decisiones que giraron <span class="step">a mitad de camino</span></h2>
+
+    <div class="block">
+      <h3>El PARO necesitaba camino propio</h3>
+      <p>
+        La regla «un ciclo empezado se termina» es correcta para una caída de
+        enlace: nadie pidió parar, y una ración completa tiene masa conocida
+        mientras que una cortada no. Se aplicó también al botón de PARO, y ahí
+        estaba mal. Quien pulsa PARO <em>está pidiendo expresamente que pare</em>,
+        probablemente mirando la máquina. Dos casos distintos, dos caminos: de
+        ahí la clave <code>/paro</code> separada de <code>/motores</code>.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>El mínimo mecánico no era el mínimo útil</h3>
+      <p>
+        El aspersor se estaba calibrando buscando el duty al que el eje empieza a
+        girar. Mario lo corrigió en una frase: <em>«sí gira, pero esa velocidad
+        no me sirve para esparcir»</em>. Son dos umbrales distintos y el evidente
+        es el equivocado — anclar el nivel 1 en el mecánico habría desperdiciado
+        los tres primeros niveles girando sin lanzar comida.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>La app es evidencia de intención, no contrato cerrado</h3>
+      <p>
+        Se dedujo del código de la app que el aspersor no necesitaba control
+        remoto, porque la app no lo ofrecía. Falso: la app está sin terminar. Lo
+        que la app demuestra es lo que ya se decidió, no lo que falta por
+        decidir.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>Una tabla de calibración que la física discute</h3>
+      <p>
+        El alcance del aspersor se modeló lineal <em>porque así se observó</em>,
+        pero el alcance de un proyectil crece con el cuadrado de la velocidad de
+        salida. La tabla se dejó en uso y con el reparo anotado, en vez de
+        maquillarla: lo honesto es publicar lo medido y marcar dónde se espera
+        que falle.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ESTADO ===================== -->
+  <section id="estado">
+    <h2>Estado final <span class="step">al 10 de agosto de 2026</span></h2>
+
+    <p>
+      Los ocho pasos cerrados y verificados con hardware real. Lo que queda no es
+      firmware por escribir sino hardware por conectar y una app por alinear.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Pendiente</th><th>De qué depende</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Probar los brushless: que los ESC armen y los ejes giren bien</td><td>Los motores están en el laboratorio</td></tr>
+          <tr><td>Cablear y verificar el MAX4466 (5c)</td><td>El sensor no había llegado</td></tr>
+          <tr><td>Corregir <code>Aspersion.java</code>: la app ancla nivel 0 = 1 m, el firmware ancla nivel 1 = 1 m y reserva el 0 para apagar</td><td>Cambio en la app Android</td></tr>
+          <tr><td>Añadir <code>paro.put("paro", true)</code> al botón de PARO de la app</td><td>Cambio en la app Android</td></tr>
+          <tr><td>Recalibrar el pH con buffers de 4,00 y 7,00</td><td>La calibración actual se hizo con tiras reactivas</td></tr>
+          <tr><td>Comprobar en campo los metros del aspersor</td><td>Modelo lineal con reparo anotado</td></tr>
+          <tr><td>Revisar las reglas de seguridad de la base de datos</td><td>—</td></tr>
+          <tr><td>Medir el consumo real en reposo con pinza antes de comprar batería</td><td>El reparto diario es un supuesto, no una medida</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pending">
+      <div class="title">Lo que este documento no dice</div>
+      <p>
+        El «por qué» de cada decisión técnica vive en <code>CLAUDE.md</code>, y
+        el «cómo se cablea» en los otros dos documentos de <code>docs/</code>.
+        Este solo cuenta el camino: qué se hizo, en qué orden y contra qué se
+        comprobó.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Alimentadora acuícola · proyecto de titulación ESPOL · Mario Viteri y Joshua
+    Defilippi. Del 7 al 10 de agosto de 2026. Las cifras de esta página son
+    medidas tomadas en banco o en la cadena completa, salvo donde se indica lo
+    contrario; los sub‑pasos corresponden a los commits del repositorio.
+  </footer>
+
+</div>
