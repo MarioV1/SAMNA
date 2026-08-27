@@ -1,0 +1,937 @@
+<title>Alimentadora — montaje preliminar sin batería</title>
+
+<style>
+  :root {
+    --ground:  #F6F7F8;
+    --surface: #FFFFFF;
+    --sunk:    #EDEFF2;
+    --line:    #DCE0E6;
+    --ink:     #191E25;
+    --muted:   #5B6573;
+    --accent:  #B4740F;
+    --accent-soft: #FBF1DE;
+    --danger:  #B3392B;
+    --danger-soft: #FBEAE7;
+    --ok:      #226D5D;
+    --ok-soft: #E4F1EE;
+    --wire-red:    #C0392B;
+    --wire-black:  #2B3038;
+    --wire-yellow: #C99A12;
+    --wire-blue:   #2C6BA8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:  #0F1319;
+      --surface: #161B22;
+      --sunk:    #1C222B;
+      --line:    #2A313B;
+      --ink:     #E3E7ED;
+      --muted:   #909BA9;
+      --accent:  #E0A33C;
+      --accent-soft: #2A2113;
+      --danger:  #EE6C59;
+      --danger-soft: #2E1815;
+      --ok:      #55B79F;
+      --ok-soft: #14231F;
+      --wire-red:    #E5695A;
+      --wire-black:  #9AA4B2;
+      --wire-yellow: #E0B740;
+      --wire-blue:   #6CA6DC;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:  #0F1319;
+    --surface: #161B22;
+    --sunk:    #1C222B;
+    --line:    #2A313B;
+    --ink:     #E3E7ED;
+    --muted:   #909BA9;
+    --accent:  #E0A33C;
+    --accent-soft: #2A2113;
+    --danger:  #EE6C59;
+    --danger-soft: #2E1815;
+    --ok:      #55B79F;
+    --ok-soft: #14231F;
+    --wire-red:    #E5695A;
+    --wire-black:  #9AA4B2;
+    --wire-yellow: #E0B740;
+    --wire-blue:   #6CA6DC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 22px 90px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  /* ---------- cabecera ---------- */
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 5vw, 38px);
+    font-weight: 650;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  nav.jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 6px;
+  }
+
+  nav.jump a {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 11px;
+  }
+  nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+  nav.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- secciones ---------- */
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  h2 {
+    margin: 0;
+    font-size: 23px;
+    font-weight: 640;
+    letter-spacing: -0.015em;
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  h2 .step {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    margin-left: 10px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  p { margin: 0; max-width: 66ch; }
+
+  .block { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ---------- diagramas ---------- */
+
+  figure {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; width: 100%; height: auto; min-width: 460px; }
+  figcaption {
+    margin-top: 12px;
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 60ch;
+  }
+
+  svg text {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    fill: var(--ink);
+  }
+  svg text.small { font-size: 10.5px; fill: var(--muted); }
+  svg .box { fill: var(--sunk); stroke: var(--line); stroke-width: 1.5; }
+  svg .wire { stroke-width: 2.5; fill: none; stroke-linecap: round; }
+  svg .pad { stroke: var(--line); stroke-width: 1; }
+
+  /* ---------- tablas ---------- */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    background: var(--sunk);
+  }
+  td.mono, th.mono, td code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  td.mono { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+  tr.group td {
+    background: var(--sunk);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: var(--sunk);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 3px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  .pill.ok   { background: var(--ok-soft);     color: var(--ok);     }
+  .pill.pend { background: var(--accent-soft); color: var(--accent); }
+  .pill.no   { background: var(--danger-soft); color: var(--danger); }
+
+  /* ---------- avisos ---------- */
+
+  .warn {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--danger-soft);
+    border-left: 3px solid var(--danger);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .warn .title {
+    font-weight: 650;
+    font-size: 14.5px;
+    color: var(--danger);
+    letter-spacing: -0.005em;
+  }
+  .warn p { font-size: 14.5px; max-width: 62ch; }
+
+  .note {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--ok-soft);
+    border-left: 3px solid var(--ok);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .note .title { font-weight: 650; font-size: 14.5px; color: var(--ok); }
+  .note p { font-size: 14.5px; max-width: 62ch; }
+
+  .pending {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 5px 5px 0;
+    padding: 14px 17px;
+  }
+  .pending .title { font-weight: 650; font-size: 14.5px; color: var(--accent); }
+  .pending p { font-size: 14.5px; max-width: 62ch; }
+
+  ul { margin: 0; padding-left: 20px; max-width: 64ch; }
+  li { margin-bottom: 5px; }
+  li:last-child { margin-bottom: 0; }
+
+  /* ---------- listas de comprobación ---------- */
+
+  ul.check {
+    list-style: none;
+    padding-left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    max-width: 64ch;
+  }
+  ul.check li { margin: 0; }
+  ul.check label {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    font-size: 14.5px;
+    cursor: pointer;
+  }
+  ul.check input {
+    flex: none;
+    margin: 5px 0 0;
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+  }
+  ul.check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ul.check input:checked + span { color: var(--muted); text-decoration: line-through; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    font-size: 13.5px;
+    color: var(--muted);
+    max-width: 64ch;
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 28px 16px 60px; gap: 32px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Alimentadora acuícola · Piscina</div>
+    <h1>Montaje preliminar sobre la estructura</h1>
+    <p class="lede">
+      Todas las conexiones del sistema, en un solo sitio, para pasar del banco a
+      la estructura <strong>sin batería</strong> y con las mismas fuentes de
+      siempre. El detalle de cada bloque —por qué cada resistencia, cada
+      condensador— sigue en <em>Esquemas de conexión</em>; esto es el inventario
+      de cables y el orden de armarlo.
+    </p>
+    <nav class="jump">
+      <a href="#fuentes">Alimentación sin batería</a>
+      <a href="#tabla">Tabla maestra</a>
+      <a href="#bts">BTS7960</a>
+      <a href="#esc">ESC</a>
+      <a href="#placa">Ya viene en la placa</a>
+      <a href="#orden">Orden de montaje</a>
+      <a href="#fuera">Lo que no va todavía</a>
+    </nav>
+  </header>
+
+  <!-- ===================== FUENTES ===================== -->
+  <section id="fuentes">
+    <h2>Alimentación sin batería <span class="step">dos fuentes, una sola masa</span></h2>
+
+    <p>
+      En el banco hay dos fuentes y siguen siendo las mismas sobre la estructura:
+      el <strong>adaptador de 12 V / 3 A</strong> para la potencia y el
+      <strong>USB del portátil</strong> para la Heltec. Lo que cambia al montarlo
+      sobre el catamarán es la longitud de los cables — y con ella, la única cosa
+      que se rompe fácil: la masa común.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 620 320" role="img" aria-label="Topología de alimentación del montaje preliminar sin batería">
+        <!-- fuente 12 V -->
+        <rect class="box" x="14" y="20" width="132" height="60" rx="6"/>
+        <text x="80" y="44" text-anchor="middle" font-weight="600">Adaptador</text>
+        <text class="small" x="80" y="62" text-anchor="middle">12 V · 3 A</text>
+
+        <!-- portatil -->
+        <rect class="box" x="14" y="216" width="132" height="60" rx="6"/>
+        <text x="80" y="240" text-anchor="middle" font-weight="600">Portátil</text>
+        <text class="small" x="80" y="258" text-anchor="middle">USB · 5 V</text>
+
+        <!-- cargas 12 V -->
+        <rect class="box" x="404" y="14" width="200" height="46" rx="5"/>
+        <text x="504" y="33" text-anchor="middle">2 × ESC + brushless</text>
+        <text class="small" x="504" y="49" text-anchor="middle">sin hélices</text>
+
+        <rect class="box" x="404" y="86" width="200" height="46" rx="5"/>
+        <text x="504" y="105" text-anchor="middle">2 × BTS7960</text>
+        <text class="small" x="504" y="121" text-anchor="middle">sinfín · aspersor</text>
+
+        <!-- heltec -->
+        <rect class="box" x="404" y="216" width="200" height="60" rx="6"/>
+        <text x="504" y="240" text-anchor="middle" font-weight="600">Heltec V3</text>
+        <text class="small" x="504" y="258" text-anchor="middle">3V3 y 5 V para sensores</text>
+
+        <!-- positivo 12 V -->
+        <path class="wire" stroke="var(--wire-red)" d="M146 40 H250 V37 H404"/>
+        <path class="wire" stroke="var(--wire-red)" d="M250 40 V109 H404"/>
+        <circle cx="250" cy="40" r="4.5" fill="var(--wire-red)"/>
+        <text class="small" x="262" y="76" fill="var(--wire-red)">+12 V</text>
+
+        <!-- USB -->
+        <path class="wire" stroke="var(--wire-red)" d="M146 240 H404"/>
+        <text class="small" x="275" y="232" text-anchor="middle" fill="var(--wire-red)">+5 V USB</text>
+
+        <!-- masa: punto estrella -->
+        <path class="wire" stroke="var(--wire-black)" d="M146 66 H196 V166"/>
+        <circle cx="196" cy="166" r="6" fill="var(--wire-black)"/>
+        <text class="small" x="196" y="188" text-anchor="middle">punto estrella</text>
+        <text class="small" x="196" y="202" text-anchor="middle">(− del adaptador)</text>
+
+        <path class="wire" stroke="var(--wire-black)" d="M196 166 V150 H340 V51 H404"/>
+        <path class="wire" stroke="var(--wire-black)" d="M340 123 H404"/>
+        <circle cx="340" cy="123" r="4.5" fill="var(--wire-black)"/>
+
+        <!-- el cable critico -->
+        <path class="wire" stroke="var(--accent)" stroke-width="3.5" d="M196 166 V262 H404"/>
+        <circle cx="404" cy="262" r="5" fill="var(--accent)"/>
+        <text class="small" x="300" y="282" text-anchor="middle" fill="var(--accent)">masa común — el cable que se olvida</text>
+      </svg>
+      <figcaption>
+        Las dos fuentes son independientes salvo por un cable: el que une el
+        negativo del adaptador con el <code>GND</code> de la Heltec. Sin él el
+        montaje parece bien hecho y no funciona nada.
+      </figcaption>
+    </figure>
+
+    <div class="warn">
+      <div class="title">Une las masas antes de dar tensión</div>
+      <p>
+        La señal que la Heltec manda a un ESC son 3,3 V <strong>respecto a
+        algo</strong>. Si el adaptador y la Heltec no comparten cero, ese "algo"
+        no existe: el ESC no arma, el <code>RPWM</code> del BTS7960 no conmuta y
+        los motores no giran. Es el fallo número uno de este tipo de montaje y no
+        da ningún síntoma que apunte a la causa.
+      </p>
+      <p>
+        Todas las masas al <strong>negativo del adaptador</strong>, cada una por
+        su cable. Es la misma estrella del documento de energía, con el borne del
+        adaptador haciendo de negativo de batería.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Aquí sí puedes tener el USB puesto</div>
+      <p>
+        El aviso de "no juntes el USB con el buck" no aplica en este montaje,
+        porque <strong>el buck no está</strong>. Las dos fuentes alimentan raíles
+        distintos: el adaptador da 12 V a la potencia, el USB da 5 V a la Heltec,
+        y solo comparten la masa. No se enfrentan.
+      </p>
+      <p>
+        Cuando entre la batería y el buck, entonces sí: o buck o USB, nunca los
+        dos.
+      </p>
+    </div>
+
+    <div class="block">
+      <h3>Qué aguantan 3 amperios y qué no</h3>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th>Prueba</th><th class="mono">Consumo</th><th>Con el adaptador</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Solo la Heltec y los sensores</td><td class="mono">~0,25 A</td><td><span class="pill ok">sobra</span></td></tr>
+            <tr><td>Ciclo de dosificación completo</td><td class="mono">~1 A</td><td><span class="pill ok">sobra</span></td></tr>
+            <tr><td>Sinfín y aspersor a la vez</td><td class="mono">~2 A</td><td><span class="pill ok">justo, va</span></td></tr>
+            <tr><td>ESC armando, ejes al aire</td><td class="mono">&lt; 1 A</td><td><span class="pill ok">sobra</span></td></tr>
+            <tr><td>Dos brushless con hélices en agua</td><td class="mono">hasta 16 A</td><td><span class="pill no">imposible</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Con hélices puestas el adaptador no llega ni a la quinta parte de lo que
+        piden los dos motores. Lo que hace una fuente pequeña ante ese pico no es
+        avisar: <strong>se le hunde la tensión</strong>, y con ella se cae la
+        Heltec a mitad de prueba. Para este montaje, los propulsores giran
+        <strong>al aire y de uno en uno</strong>.
+      </p>
+    </div>
+
+    <div class="pending">
+      <div class="title">Prueba un bloque a la vez</div>
+      <p>
+        3 A es suficiente para todo lo que hay que verificar aquí, pero no para
+        verificarlo <strong>simultáneamente</strong>. Sinfín, aspersor y
+        propulsores por separado; si vas a lanzar una dosificación larga, deja
+        los ESC en neutro.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== TABLA MAESTRA ===================== -->
+  <section id="tabla">
+    <h2>Tabla maestra de conexiones <span class="step">todo el cableado externo</span></h2>
+
+    <p>
+      Todo lo que hay que cablear a mano. Lo que ya viene soldado en la placa
+      —radio, OLED, divisor de batería— está aparte, en
+      <a href="#placa">Ya viene en la placa</a>.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Desde</th><th>Hasta</th><th>Nota</th></tr>
+        </thead>
+        <tbody>
+          <tr class="group"><td colspan="3">Potencia — adaptador de 12 V</td></tr>
+          <tr>
+            <td class="mono">12 V (+)</td>
+            <td class="mono">B+ · BTS7960 ×2 y ESC ×2</td>
+            <td>cuatro derivaciones del mismo positivo</td>
+          </tr>
+          <tr>
+            <td class="mono">12 V (−)</td>
+            <td class="mono">B− · BTS7960 ×2 y ESC ×2</td>
+            <td>cada uno por su cable al punto estrella</td>
+          </tr>
+          <tr>
+            <td class="mono">12 V (−)</td>
+            <td class="mono">GND · Heltec</td>
+            <td><strong>el cable crítico</strong> — referencia de todas las señales</td>
+          </tr>
+
+          <tr class="group"><td colspan="3">DS18B20 — temperatura</td></tr>
+          <tr><td class="mono">3V3</td><td class="mono">VCC (rojo)</td><td>—</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">GND (negro)</td><td>—</td></tr>
+          <tr><td class="mono">GPIO 7</td><td class="mono">DATA (amarillo)</td><td>+ pull‑up de 4,7 kΩ entre DATA y 3V3</td></tr>
+
+          <tr class="group"><td colspan="3">Módulo de pH HW‑828</td></tr>
+          <tr><td class="mono">5 V</td><td class="mono">VCC del módulo</td><td>el módulo es de 5 V, no de 3V3</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">GND del módulo</td><td>—</td></tr>
+          <tr><td class="mono">Po</td><td class="mono">nodo, vía 10 kΩ</td><td>Po llega a 4,0 V — nunca directo al GPIO</td></tr>
+          <tr><td class="mono">nodo</td><td class="mono">GPIO 5</td><td>el GPIO ve la mitad de Po</td></tr>
+          <tr><td class="mono">nodo</td><td class="mono">GND, vía 10 kΩ</td><td>la de abajo del divisor</td></tr>
+          <tr><td class="mono">nodo</td><td class="mono">GND, vía 1 µF</td><td>opcional — filtro a 32 Hz</td></tr>
+
+          <tr class="group"><td colspan="3">MAX4466 — sonido <span class="pill ok">cableado</span> <span class="pill pend">sin firmware</span></td></tr>
+          <tr><td class="mono">3V3</td><td class="mono">VCC</td><td><strong>nunca 5 V</strong> — la salida se centra en VCC/2</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">GND</td><td>—</td></tr>
+          <tr><td class="mono">GPIO 6</td><td class="mono">OUT</td><td>sin condensador en esta línea</td></tr>
+          <tr><td class="mono">—</td><td class="mono">—</td><td>27 ago: <code>OUT</code>–<code>GND</code> en reposo ≈ 1,65 V, la mitad de 3V3. El módulo está vivo y bien alimentado</td></tr>
+
+          <tr class="group"><td colspan="3">BTS7960 #1 — dosificador (sinfín)</td></tr>
+          <tr><td class="mono">GPIO 47</td><td class="mono">RPWM</td><td>—</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">LPWM</td><td>fijo a masa</td></tr>
+          <tr><td class="mono">3V3</td><td class="mono">R_EN · L_EN</td><td>los dos altos, obligatorio</td></tr>
+          <tr><td class="mono">3V3 · GND</td><td class="mono">VCC · GND lógicos</td><td>mismo raíl que los EN</td></tr>
+          <tr><td class="mono">M+ · M−</td><td class="mono">JGB37‑520 60 rpm</td><td><strong>intercambiados</strong> — ver aviso abajo</td></tr>
+
+          <tr class="group"><td colspan="3">BTS7960 #2 — aspersor</td></tr>
+          <tr><td class="mono">GPIO 48</td><td class="mono">RPWM</td><td>—</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">LPWM</td><td>fijo a masa</td></tr>
+          <tr><td class="mono">3V3</td><td class="mono">R_EN · L_EN</td><td>los dos altos, obligatorio</td></tr>
+          <tr><td class="mono">3V3 · GND</td><td class="mono">VCC · GND lógicos</td><td>mismo raíl que los EN</td></tr>
+          <tr><td class="mono">M+ · M−</td><td class="mono">JGB37‑520 600 rpm</td><td>sentido indiferente — el disco esparce igual</td></tr>
+
+          <tr class="group"><td colspan="3">ESC babor</td></tr>
+          <tr><td class="mono">GPIO 2</td><td class="mono">señal (cable de datos)</td><td>—</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">masa del conector de señal</td><td>—</td></tr>
+          <tr><td class="mono">—</td><td class="mono">cable central del conector</td><td><span class="pill no">sin conectar</span> BEC de 5 V</td></tr>
+          <tr><td class="mono">3 fases</td><td class="mono">APISQUEEN U2 MINI</td><td>orden libre; se corrige después si gira al revés</td></tr>
+
+          <tr class="group"><td colspan="3">ESC estribor</td></tr>
+          <tr><td class="mono">GPIO 4</td><td class="mono">señal (cable de datos)</td><td>—</td></tr>
+          <tr><td class="mono">GND</td><td class="mono">masa del conector de señal</td><td>—</td></tr>
+          <tr><td class="mono">—</td><td class="mono">cable central del conector</td><td><span class="pill no">sin conectar</span> BEC de 5 V</td></tr>
+          <tr><td class="mono">3 fases</td><td class="mono">APISQUEEN U2 MINI</td><td>orden libre; se corrige después si gira al revés</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <div class="title">Cuenta rápida de cables</div>
+      <p>
+        Nueve masas distintas llegan al punto estrella: las cuatro de potencia,
+        la de la Heltec y las de señal. Si al terminar tienes menos, falta alguna
+        — y la que suele faltar es la de señal de un ESC, porque su conector la
+        trae junto a la señal y parece que ya está hecha.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== BTS7960 ===================== -->
+  <section id="bts">
+    <h2>Los dos BTS7960 <span class="step">idénticos salvo un detalle</span></h2>
+
+    <p>
+      Los dos módulos se cablean exactamente igual. Lo único que los distingue es
+      el GPIO que gobierna el <code>RPWM</code> y el motor que cuelga de
+      <code>M+</code>/<code>M−</code>.
+    </p>
+
+    <figure>
+      <svg viewBox="0 0 620 250" role="img" aria-label="Cableado de un módulo BTS7960">
+        <rect class="box" x="14" y="26" width="140" height="196" rx="6"/>
+        <text x="84" y="50" text-anchor="middle" font-weight="600">Heltec V3</text>
+        <text class="small" x="84" y="66" text-anchor="middle">lado lógico</text>
+
+        <rect class="box" x="330" y="26" width="150" height="196" rx="6"/>
+        <text x="405" y="50" text-anchor="middle" font-weight="600">BTS7960</text>
+        <text class="small" x="405" y="66" text-anchor="middle">medio puente</text>
+
+        <!-- motor -->
+        <rect class="box" x="540" y="96" width="66" height="66" rx="33"/>
+        <text class="small" x="573" y="133" text-anchor="middle">motor</text>
+
+        <!-- RPWM -->
+        <circle class="pad" cx="154" cy="96" r="4" fill="var(--wire-yellow)"/>
+        <path class="wire" stroke="var(--wire-yellow)" d="M154 96 H330"/>
+        <text class="small" x="166" y="90">GPIO 47 / 48</text>
+        <text class="small" x="318" y="90" text-anchor="end">RPWM</text>
+
+        <!-- LPWM -->
+        <circle class="pad" cx="154" cy="128" r="4" fill="var(--wire-black)"/>
+        <path class="wire" stroke="var(--wire-black)" d="M154 128 H330"/>
+        <text class="small" x="166" y="122">GND</text>
+        <text class="small" x="318" y="122" text-anchor="end">LPWM</text>
+
+        <!-- EN -->
+        <circle class="pad" cx="154" cy="160" r="4" fill="var(--wire-red)"/>
+        <path class="wire" stroke="var(--wire-red)" d="M154 160 H286 V150 H330"/>
+        <path class="wire" stroke="var(--wire-red)" d="M286 160 V172 H330"/>
+        <circle cx="286" cy="160" r="4" fill="var(--wire-red)"/>
+        <text class="small" x="166" y="154">3V3</text>
+        <text class="small" x="318" y="146" text-anchor="end">R_EN</text>
+        <text class="small" x="318" y="176" text-anchor="end">L_EN</text>
+
+        <!-- GND logico -->
+        <circle class="pad" cx="154" cy="200" r="4" fill="var(--wire-black)"/>
+        <path class="wire" stroke="var(--wire-black)" d="M154 200 H330"/>
+        <text class="small" x="166" y="194">GND</text>
+        <text class="small" x="318" y="194" text-anchor="end">GND</text>
+
+        <!-- 12 V -->
+        <path class="wire" stroke="var(--wire-red)" d="M405 26 V6"/>
+        <text class="small" x="415" y="18">B+ · 12 V del adaptador</text>
+
+        <!-- motor -->
+        <path class="wire" stroke="var(--wire-blue)" d="M480 116 H540"/>
+        <path class="wire" stroke="var(--wire-blue)" d="M480 142 H540"/>
+        <text class="small" x="492" y="110">M+</text>
+        <text class="small" x="492" y="164">M−</text>
+
+        <text class="small" x="405" y="240" text-anchor="middle">solo se gobierna RPWM · un sentido de giro</text>
+      </svg>
+      <figcaption>
+        Los dos <code>EN</code> en alto no son opcionales: con <code>L_EN</code>
+        bajo el medio puente izquierdo queda en alta impedancia, el motor se
+        queda sin retorno y no gira aunque el <code>RPWM</code> conmute
+        perfectamente.
+      </figcaption>
+    </figure>
+
+    <div class="warn">
+      <div class="title">El sinfín va con M+ y M− intercambiados</div>
+      <p>
+        No es un error de cableado: está así a propósito. El sinfín solo empuja la
+        comida hacia la salida en <strong>uno</strong> de los dos sentidos; en el
+        otro la arrastra hacia el fondo de la tolva. Se determinó en banco
+        probando los dos.
+      </p>
+      <p>
+        Si al montarlo sobre la estructura alguien "corrige" ese cruce, el motor
+        girará al revés y el sistema seguirá diciendo que dosificó. Y si tienes
+        que remontar el motor y ves que empuja hacia dentro:
+        <strong>intercambia <code>M+</code> y <code>M−</code></strong>, nunca
+        <code>RPWM</code> por <code>LPWM</code>.
+      </p>
+    </div>
+
+    <div class="pending">
+      <div class="title">Comprueba el pull‑down antes de dar los 12 V</div>
+      <p>
+        Al reset, y hasta que el firmware configura los pines, <code>RPWM</code>
+        queda flotando. Mide con el óhmetro si el módulo trae pull‑down de fábrica
+        entre <code>RPWM</code> y <code>GND</code>; si no, suelda 4,7 kΩ
+        <strong>en el módulo</strong>, no en el lado del ESP32 — así, si el cable
+        se suelta, la resistencia se queda donde hace falta.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Si tu VCC lógico está en 5 V, déjalo</div>
+      <p>
+        El BTS7960 admite lógica desde 3 V, así que funciona en cualquiera de los
+        dos raíles. Lo que no puede cambiar es que <code>R_EN</code> y
+        <code>L_EN</code> estén altos y que <code>LPWM</code> esté a masa.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ESC ===================== -->
+  <section id="esc">
+    <h2>Los dos ESC <span class="step">tres cables de señal, dos usados</span></h2>
+
+    <p>
+      El conector de señal del ESC trae tres cables como el de un servo: señal,
+      alimentación y masa. Aquí se usan <strong>dos</strong>.
+    </p>
+
+    <div class="warn">
+      <div class="title">El cable central del conector no se conecta</div>
+      <p>
+        Ese es el BEC: el ESC saca 5 V por ahí para alimentar un receptor de
+        radio. La Heltec ya viene alimentada por USB, y juntar dos fuentes en el
+        mismo raíl de 5 V es la forma rápida de perder la placa. Déjalo suelto y
+        aislado — no lo cortes, que hará falta si algún día se alimenta desde ahí.
+      </p>
+    </div>
+
+    <div class="warn">
+      <div class="title">Sin hélices, y sujetos a algo firme</div>
+      <p>
+        Todo lo que hay que verificar en este montaje —que arman, que giran, en
+        qué sentido lo hacen y que la mezcla diferencial es correcta— se ve con el
+        eje al aire. Poner hélices no añade información y sí añade un motor suelto
+        girando sobre la estructura.
+      </p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Comando</th><th class="mono">Babor</th><th class="mono">Estribor</th><th>Qué se ve</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">tv 0</td><td class="mono">1500 µs</td><td class="mono">1500 µs</td><td>los dos parados</td></tr>
+          <tr><td class="mono">tv 1</td><td class="mono">1800 µs</td><td class="mono">1800 µs</td><td>los dos hacia avante</td></tr>
+          <tr><td class="mono">tv 2</td><td class="mono">1200 µs</td><td class="mono">1200 µs</td><td>los dos hacia atrás</td></tr>
+          <tr><td class="mono">tv 3</td><td class="mono">1800 µs</td><td class="mono">1200 µs</td><td>sentidos opuestos — giro horario</td></tr>
+          <tr><td class="mono">tv 4</td><td class="mono">1200 µs</td><td class="mono">1800 µs</td><td>sentidos opuestos — antihorario</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <div class="title">Si un motor gira al revés</div>
+      <p>
+        Intercambia <strong>dos cualesquiera de las tres fases</strong> de ese
+        motor. No toques la señal ni el firmware: en un brushless el sentido lo
+        fija el orden de las fases, y es la corrección estándar.
+      </p>
+    </div>
+
+    <div class="pending">
+      <div class="title">Los comandos de consola no caducan</div>
+      <p>
+        El <em>deadman</em> de 2 s protege los comandos que llegan por LoRa, no
+        los que escribes tú por el monitor. Un <code>tv 1</code> deja los motores
+        girando hasta que mandes <code>tv 0</code> o <code>x</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== PLACA ===================== -->
+  <section id="placa">
+    <h2>Ya viene en la placa <span class="step">no cablear, no reasignar</span></h2>
+
+    <p>
+      Estos pines están ocupados por hardware soldado en la Heltec V3. No hay nada
+      que conectar, y colgarles algo rompe la radio o la pantalla.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>GPIO</th><th>Qué es</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">8 · 9 · 10 · 11</td><td>SPI del SX1262 — NSS, SCK, MOSI, MISO</td></tr>
+          <tr><td class="mono">12 · 13 · 14</td><td>LoRa RST · BUSY · DIO1</td></tr>
+          <tr><td class="mono">17 · 18 · 21</td><td>OLED SSD1306 — SDA, SCL, RST</td></tr>
+          <tr><td class="mono">1 · 37</td><td>divisor de batería de fábrica y su habilitación</td></tr>
+          <tr><td class="mono">35 · 36</td><td>LED de placa · control de Vext</td></tr>
+          <tr><td class="mono">43 · 44</td><td>UART0 → puente CP2102 → conector USB</td></tr>
+          <tr><td class="mono">19 · 20</td><td>libres, de reserva — sin verificar con multímetro</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <div class="title">El divisor de batería sigue leyendo algo</div>
+      <p>
+        Sin batería, ese ADC mide lo que le llegue por el raíl de 5 V del USB. El
+        número que salga por el monitor <strong>no significa nada</strong> en este
+        montaje; ignóralo hasta que entre la LiFePO4.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== ORDEN ===================== -->
+  <section id="orden">
+    <h2>Orden de montaje <span class="step">y qué comprobar en cada paso</span></h2>
+
+    <p>
+      El orden importa: cada bloque se verifica antes de añadir el siguiente, para
+      que un fallo tenga una sola causa posible.
+    </p>
+
+    <div class="block">
+      <h3>1 · Masas y estructura, sin tensión</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span>Módulos fijados a la estructura, con los cables ya a su longitud definitiva.</span></label></li>
+        <li><label><input type="checkbox"><span>Todas las masas al negativo del adaptador, cada una por su cable.</span></label></li>
+        <li><label><input type="checkbox"><span>Continuidad con el multímetro entre <code>GND</code> de la Heltec y <code>B−</code> de cada módulo.</span></label></li>
+        <li><label><input type="checkbox"><span>Ninguna continuidad entre <code>+12 V</code> y masa. Comprobar antes de enchufar nada.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>2 · Solo la Heltec, por USB</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span>Adaptador de 12 V <strong>desenchufado</strong>.</span></label></li>
+        <li><label><input type="checkbox"><span>La placa arranca, la OLED muestra estado y el enlace LoRa con Estacion se establece.</span></label></li>
+        <li><label><input type="checkbox"><span><code>?</code> por el monitor: estado completo sin errores.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>3 · Sensores</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span>DS18B20 dando temperatura ambiente coherente.</span></label></li>
+        <li><label><input type="checkbox"><span>pH: la tensión cruda del nodo por debajo de 3,3 V — medir con el multímetro antes de fiarse del ADC.</span></label></li>
+        <li><label><input type="checkbox"><span>La telemetría llega a Firebase y la app la muestra.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>4 · Adaptador de 12 V, sin motores conectados</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span><code>M+</code>/<code>M−</code> desconectados de los dos BTS7960 y fases de los ESC desconectadas.</span></label></li>
+        <li><label><input type="checkbox"><span>12 V medidos en <code>B+</code> de los cuatro módulos.</span></label></li>
+        <li><label><input type="checkbox"><span><code>tg 1</code> y <code>tg 2</code>: localizar los pines de señal de los ESC con el multímetro.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>5 · Dosificador</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span>Motor del sinfín conectado, respetando el cruce de <code>M+</code>/<code>M−</code>.</span></label></li>
+        <li><label><input type="checkbox"><span><code>ar 2000</code>: gira 2 s y para. Comprobar que el sinfín empuja <strong>hacia la salida</strong>.</span></label></li>
+        <li><label><input type="checkbox"><span>Una dosis real desde la app, pesada en balanza. Debe caer dentro del ±5 %.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>6 · Aspersor</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span><code>sl 1</code> — el disco gira al duty mínimo útil.</span></label></li>
+        <li><label><input type="checkbox"><span><code>sw</code> — barrido completo, sin que la fuente se resienta.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>7 · Propulsión, uno cada vez</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span>Hélices fuera. Motores sujetos a la estructura.</span></label></li>
+        <li><label><input type="checkbox"><span>Señal presente en el pin <strong>antes</strong> de dar los 12 V al ESC.</span></label></li>
+        <li><label><input type="checkbox"><span>Al alimentar, cada ESC emite su secuencia de pitidos de armado. Si uno no pita, ese ESC no armó: no sigas.</span></label></li>
+        <li><label><input type="checkbox"><span><code>tv 1</code> — los dos ejes hacia avante. Anotar cuál gira al revés, si alguno.</span></label></li>
+        <li><label><input type="checkbox"><span><code>tv 3</code> — sentidos opuestos.</span></label></li>
+        <li><label><input type="checkbox"><span><code>x</code> para parar. Corregir sentidos intercambiando dos fases.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <h3>8 · El sistema completo desde la app</h3>
+      <ul class="check">
+        <li><label><input type="checkbox"><span>Un ciclo de alimentación entero disparado desde la app.</span></label></li>
+        <li><label><input type="checkbox"><span>PARO durante el ciclo — <strong>escribiendo <code>/paro</code> a mano desde la consola de Firebase</strong>, porque la app todavía no lo escribe.</span></label></li>
+        <li><label><input type="checkbox"><span>Navegación desde el mando: soltar el dedo debe parar los motores en menos de 2 s.</span></label></li>
+      </ul>
+    </div>
+
+    <div class="warn">
+      <div class="title">La prueba de PARO no la puedes hacer con el botón todavía</div>
+      <p>
+        El firmware lee, reenvía y borra <code>/paro</code>, y está verificado.
+        Lo que falta es del lado de la app: añadir
+        <code>paro.put("paro", true)</code> al <code>pararTodo()</code> de
+        <code>controlNavActivity</code> y al <code>btnParo</code> de
+        <code>controlActivity</code>. Hasta entonces el botón rojo de la app
+        <strong>no detiene una dosificación en curso</strong> — y una dosificación
+        de kilos dura minutos.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== FUERA ===================== -->
+  <section id="fuera">
+    <h2>Lo que no va todavía <span class="step">deliberadamente ausente</span></h2>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Elemento</th><th>Por qué no</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Batería LiFePO4</td><td>aún sin comprar; el criterio de BMS ≥ 30 A está en el documento de energía</td></tr>
+          <tr><td>Panel de 20 W y MPPT</td><td>van detrás de la batería, no tienen sentido sin ella</td></tr>
+          <tr><td>Buck LM2596 / MP1584EN</td><td>su trabajo lo hace el USB en este montaje</td></tr>
+          <tr><td>Fusible</td><td>protege el cable frente a una batería de litio; un adaptador de 3 A ya se limita solo</td></tr>
+          <tr><td>Condensadores de 1000 µF</td><td>tapan el hundimiento de tensión con cables largos y batería — con el adaptador y sin hélices no hace falta</td></tr>
+          <tr><td>Hélices</td><td>3 A no las mueve, y no aportan nada a lo que hay que verificar aquí</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pending">
+      <div class="title">Los condensadores sí, en cuanto entre la batería</div>
+      <p>
+        Que no hagan falta ahora no es que no hagan falta. Con cables de un metro
+        y dos brushless arrancando a la vez, la inductancia del cable impide que
+        la batería entregue el pico a tiempo y la tensión se hunde justo en el
+        arranque. Los cuatro sitios y sus valores están en
+        <em>Batería y alimentación</em>.
+      </p>
+    </div>
+
+    <div class="note">
+      <div class="title">Esta es la ocasión de dejar los cables a su longitud</div>
+      <p>
+        Los cables definitivos son el único cambio eléctrico real entre el banco y
+        la estructura, y es justo lo que hace aparecer los problemas de masa y de
+        caída de tensión. Montarlos ya, con las fuentes pequeñas y sin hélices,
+        es la forma barata de encontrarlos: si algo va a fallar por el cableado,
+        falla aquí y no con la batería puesta.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Alimentadora acuícola · proyecto de titulación ESPOL · Mario Viteri y Joshua
+    Defilippi. Pinout tomado de <code>piscina/include/pins.h</code> y
+    <code>shared/protocol.h</code>. El detalle de cada bloque está en
+    <em>Esquemas de conexión</em> y el dimensionado eléctrico en
+    <em>Batería y alimentación</em>. Si algo no coincide con lo que ves en la
+    estructura, el documento está equivocado — no lo fuerces.
+  </footer>
+
+</div>
