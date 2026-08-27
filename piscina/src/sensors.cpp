@@ -382,6 +382,174 @@ const PhStats *sensorPhStats() {
 }
 
 /* ==================================================================
+ *  Sonido — MAX4466 (paso 5c)
+ * ================================================================== */
+
+/*
+ * Muestreo troceado.
+ *
+ * El pico a pico de una señal de audio solo aparece si se muestrea rapido y
+ * seguido: una muestra suelta cae siempre en una fase distinta y no dice
+ * nada. Pero una ventana de 50 ms muestreada del tiron dejaria a la radio
+ * sorda ese rato, que es exactamente lo que esta prohibido aqui.
+ *
+ * La solucion es la misma que con el DS18B20: trocear. Cada rafaga son 16
+ * muestras seguidas —bastante para pillar la cresta de un ciclo de audio— y
+ * las rafagas se espacian 5 ms, de modo que el ADC ocupa alrededor de una
+ * quinta parte del tiempo del bucle y no toda la vuelta. La ventana acaba
+ * viendo unas 3200 muestras.
+ *
+ * Espaciarlas no pierde el pico: el ruido de alimentacion no es un chasquido
+ * aislado sino un rumor sostenido, asi que el maximo vuelve a aparecer en la
+ * rafaga siguiente. Lo que si se pierde es un transitorio unico de menos de
+ * 5 ms — y ese no es el fenomeno que este sensor existe para medir.
+ */
+#define SOUND_BURST         16
+#define SOUND_BURST_MS      5
+
+/* Cada cuanto se cierra la ventana y sale un indice nuevo. Por debajo del
+ * intervalo de telemetria (2 s), asi que cada paquete lleva un dato fresco
+ * y no el mismo repetido. */
+#define SOUND_WINDOW_MS     1000
+
+/*
+ * Banda en la que debe caer el reposo para dar el modulo por presente.
+ *
+ * Un MAX4466 a 3V3 reposa en 1.65 V, que con 11 dB de atenuacion caen en
+ * torno a 2100 cuentas. La banda es ancha a proposito: la conversion cuenta
+ * a voltios del ESP32-S3 no es lineal ni esta calibrada de fabrica, y lo
+ * que se busca aqui no es precision sino distinguir "hay un modulo" de "hay
+ * un pin al aire pegado a un extremo".
+ */
+#define SOUND_BIAS_MIN      1200
+#define SOUND_BIAS_MAX      2900
+
+/*
+ * Fondo de escala PROVISIONAL, en cuentas de pico a pico.
+ *
+ * No es una medida: es un numero para que el indice signifique algo antes
+ * de calibrar. El bueno se fija en banco con `mc`, porque depende del
+ * potenciometro de ganancia del modulo (25x a 125x) y por tanto no puede
+ * vivir compilado. Mientras siga siendo el provisional, la consola lo dice
+ * en cada `?`.
+ */
+#define SOUND_FS_DEFAULT    600
+
+/* Pico a pico minimo aceptable como fondo de escala. Por debajo de esto la
+ * referencia seria ruido de fondo, y cualquier cosa daria 100. */
+#define SOUND_FS_MIN        40
+
+static Preferences sndPrefs;
+static SoundStats  snd;
+static bool        soundOk     = false;   /* hasta la primera ventana, no */
+static uint32_t    winStart    = 0;
+static uint32_t    lastBurst   = 0;
+static uint16_t    winMin      = 0xFFFF;
+static uint16_t    winMax      = 0;
+static uint32_t    winSum      = 0;
+static uint32_t    winSamples  = 0;
+
+static void soundLoadCal() {
+  sndPrefs.begin("snd", false);
+  snd.calibrated = sndPrefs.getBool("cal", false);
+  snd.fullScale  = sndPrefs.getUShort("fs", SOUND_FS_DEFAULT);
+  if (snd.fullScale < SOUND_FS_MIN) {
+    snd.fullScale = SOUND_FS_DEFAULT;   /* NVS corrupta o de otra version */
+  }
+}
+
+static void soundResetWindow() {
+  winMin     = 0xFFFF;
+  winMax     = 0;
+  winSum     = 0;
+  winSamples = 0;
+}
+
+static void soundBurst() {
+  for (uint8_t i = 0; i < SOUND_BURST; i++) {
+    const uint16_t c = (uint16_t)analogRead(PIN_SOUND_ADC);
+    if (c < winMin) { winMin = c; }
+    if (c > winMax) { winMax = c; }
+    winSum += c;
+    winSamples++;
+  }
+}
+
+static void soundCloseWindow() {
+  if (winSamples == 0) {
+    return;   /* no deberia pasar, pero no se divide entre cero */
+  }
+
+  snd.samples    = winSamples;
+  snd.minCount   = winMin;
+  snd.maxCount   = winMax;
+  snd.bias       = (uint16_t)(winSum / winSamples);
+  snd.peakToPeak = (uint16_t)(winMax - winMin);
+  snd.windows++;
+
+  /*
+   * El reposo fuera de la banda significa modulo ausente o mal alimentado.
+   * Se marca el fallo y se deja el indice en 0, pero lo que impide que ese
+   * 0 llegue a Firebase es ST_SOUND_FAULT, no el valor.
+   */
+  if (snd.bias < SOUND_BIAS_MIN || snd.bias > SOUND_BIAS_MAX) {
+    snd.faults++;
+    snd.level = 0;
+    soundOk   = false;
+    soundResetWindow();
+    return;
+  }
+
+  uint32_t lvl = ((uint32_t)snd.peakToPeak * 100u) / snd.fullScale;
+  if (lvl > 100u) {
+    lvl = 100u;
+    snd.clipped++;
+  }
+
+  snd.level = (uint8_t)lvl;
+  soundOk   = true;
+  soundResetWindow();
+}
+
+uint8_t sensorSoundLevel() {
+  return snd.level;
+}
+
+bool sensorSoundOk() {
+  return soundOk;
+}
+
+uint16_t sensorSoundPeakToPeak() {
+  return snd.peakToPeak;
+}
+
+bool sensorSoundCalFullScale() {
+  if (!soundOk) {
+    return false;   /* el modulo no esta: la referencia no valdria nada */
+  }
+  if (snd.peakToPeak < SOUND_FS_MIN) {
+    return false;
+  }
+
+  snd.fullScale  = snd.peakToPeak;
+  snd.calibrated = true;
+  sndPrefs.putUShort("fs", snd.fullScale);
+  sndPrefs.putBool("cal", true);
+  return true;
+}
+
+void sensorSoundCalReset() {
+  snd.fullScale  = SOUND_FS_DEFAULT;
+  snd.calibrated = false;
+  sndPrefs.putUShort("fs", snd.fullScale);
+  sndPrefs.putBool("cal", false);
+}
+
+const SoundStats *sensorSoundStats() {
+  return &snd;
+}
+
+/* ==================================================================
  *  API
  * ================================================================== */
 
@@ -395,6 +563,16 @@ void sensorsBegin() {
   analogSetPinAttenuation(PIN_PH_ADC, ADC_11db);
   phLoadCal();
   phSample();
+
+  memset(&snd, 0, sizeof(snd));
+  /* Mismos 11 dB: el MAX4466 a 3V3 oscila alrededor de 1.65 V y usa casi
+   * todo el recorrido de la entrada. */
+  analogSetPinAttenuation(PIN_SOUND_ADC, ADC_11db);
+  soundLoadCal();
+  soundResetWindow();
+  soundOk   = false;  /* no se afirma nada hasta cerrar la primera ventana */
+  winStart  = millis();
+  lastBurst = winStart;
 }
 
 void sensorsPoll() {
@@ -403,6 +581,15 @@ void sensorsPoll() {
   if ((now - lastPhSample) >= PH_SAMPLE_PERIOD_MS) {
     lastPhSample = now;
     phSample();
+  }
+
+  if ((now - lastBurst) >= SOUND_BURST_MS) {
+    lastBurst = now;
+    soundBurst();
+  }
+  if ((now - winStart) >= SOUND_WINDOW_MS) {
+    winStart = now;
+    soundCloseWindow();
   }
 
   switch (state) {

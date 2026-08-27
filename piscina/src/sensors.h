@@ -3,8 +3,8 @@
  * ------------------------------------------------------------------
  * Sensores de la unidad flotante. Paso 5.
  *
- * Estado: DS18B20 implementado (5a). El pH es 5b y el MAX4466 5c, que se
- * escribira pero no se podra probar hasta que llegue el microfono.
+ * Estado: los tres implementados. DS18B20 (5a), pH (5b) y MAX4466 (5c),
+ * este ultimo cableado y comprobado el 2026-08-27.
  *
  * REGLA: nada aqui bloquea. Una conversion del DS18B20 tarda cientos de
  * milisegundos y los comandos de navegacion llegan cada NAV_REFRESH_MS
@@ -109,6 +109,79 @@ typedef struct {
 } PhStats;
 
 const PhStats *sensorPhStats();
+
+/* ------------------------------------------------------------------
+ *  Sonido — MAX4466
+ *
+ *  Mide ACTIVIDAD, no presion sonora. No es un sonometro y no da dB: da un
+ *  indice de 0 a 100 con el que comparar "ahora" contra "hace un rato".
+ *
+ *  Lo que se mide es la AMPLITUD pico a pico de una ventana, no el nivel
+ *  instantaneo. La salida del modulo reposa en VCC/2 y el sonido la hace
+ *  oscilar alrededor de ahi: la cuenta cruda del ADC dice donde esta
+ *  centrada la señal, que es siempre lo mismo, mientras que el pico a pico
+ *  dice cuanto se mueve, que es lo que cambia cuando los camarones comen.
+ * ------------------------------------------------------------------ */
+
+/*
+ * Indice de actividad de la ultima ventana cerrada, 0-100.
+ *
+ * Saturado a 100: por encima del fondo de escala no se sabe cuanto mas
+ * fuerte es, solo que se paso. Devolver 137 seria inventar precision.
+ */
+uint8_t sensorSoundLevel();
+
+/*
+ * false cuando el modulo no parece estar ahi.
+ *
+ * ALCANCE DE ESTA COMPROBACION: mira que el reposo de la ventana caiga
+ * cerca de medio rail, que es lo que hace un MAX4466 alimentado a 3V3 y lo
+ * que se midio con el multimetro al montarlo. Detecta el modulo
+ * desconectado, sin alimentar o alimentado a 5 V.
+ *
+ * NO detecta un microfono roto que siga entregando su reposo correcto: eso
+ * se ve como silencio permanente y desde el firmware es indistinguible de
+ * una piscina callada. Igual que la guarda del sinfin no detecta un sinfin
+ * atascado.
+ */
+bool sensorSoundOk();
+
+/*
+ * Pico a pico crudo de la ultima ventana, en cuentas del ADC.
+ *
+ * SIEMPRE disponible, calibrado o no. Es el numero con el que se fija el
+ * fondo de escala y con el que se puede recalcular el indice a posteriori,
+ * igual que la tension cruda de Po en el pH.
+ */
+uint16_t sensorSoundPeakToPeak();
+
+/*
+ * Fija el fondo de escala al pico a pico de la ultima ventana y lo guarda
+ * en NVS. Se ejecuta con el ruido que deba valer 100 sonando.
+ *
+ * Devuelve false si esa ventana no sirve como referencia — modulo caido, o
+ * un pico a pico tan pequeño que cualquier ruido de fondo daria 100.
+ */
+bool sensorSoundCalFullScale();
+
+/* Vuelve al fondo de escala provisional de fabrica. */
+void sensorSoundCalReset();
+
+typedef struct {
+  bool     calibrated;   /* el fondo de escala se midio en banco      */
+  uint16_t fullScale;    /* cuentas de pico a pico que valen 100      */
+  uint16_t peakToPeak;   /* pico a pico de la ultima ventana          */
+  uint16_t bias;         /* reposo de la ultima ventana, en cuentas   */
+  uint16_t minCount;     /* minimo y maximo crudos de esa ventana     */
+  uint16_t maxCount;
+  uint8_t  level;        /* el indice 0-100 que se publico            */
+  uint32_t windows;      /* ventanas cerradas                         */
+  uint32_t samples;      /* muestras tomadas en la ultima ventana     */
+  uint32_t clipped;      /* ventanas que llegaron al tope de 100      */
+  uint32_t faults;       /* ventanas con el reposo fuera de sitio     */
+} SoundStats;
+
+const SoundStats *sensorSoundStats();
 
 /* ------------------------------------------------------------------
  *  Diagnostico — para el banco y para la memoria de la tesis

@@ -464,13 +464,25 @@
     </div>
 
     <div class="pending">
-      <div class="title">El firmware todavía no existe</div>
+      <div class="title">Cableado el 27 de agosto · el firmware todavía no existe</div>
       <p>
-        La lectura del MAX4466 es el único bloque de código que quedó sin escribir.
-        Cuando tengas el sensor cableado, se programa junto con el bit
-        <code>ST_SOUND_FAULT</code> — mientras no esté verificado, Estacion debe
-        omitir <code>/nivelSonido</code> en vez de publicar el ruido de un pin al
-        aire, que parece un dato real.
+        El módulo está conectado según este esquema y comprobado con multímetro:
+        <code>OUT</code> contra <code>GND</code> en reposo da <strong>≈ 1,65 V</strong>,
+        la mitad de 3V3. Eso confirma que está vivo, alimentado a la tensión
+        correcta y que la señal llega al pin.
+      </p>
+      <p>
+        La lectura del MAX4466 sigue siendo el único bloque de código sin escribir.
+        Hasta que exista, <code>/nivelSonido</code> publica un <strong>valor
+        falso</strong> — una senoide de 400 a 600 con periodo de 44 s, en
+        <code>main.cpp</code> — que no depende del micrófono: sale igual con el
+        sensor conectado, desconectado o al revés. No lo interpretes como una
+        medida.
+      </p>
+      <p>
+        Se programa junto con el bit <code>ST_SOUND_FAULT</code> — mientras no
+        esté verificado, Estacion debe omitir <code>/nivelSonido</code> en vez de
+        publicar el ruido de un pin al aire, que parece un dato real.
       </p>
     </div>
   </section>
@@ -773,7 +785,7 @@
           <tr><td class="mono">2</td><td>ESC babor · señal servo</td><td>señal verificada</td></tr>
           <tr><td class="mono">4</td><td>ESC estribor · señal servo</td><td>señal verificada</td></tr>
           <tr><td class="mono">5</td><td>pH · <code>Po</code> tras divisor 1:2</td><td>calibrado</td></tr>
-          <tr><td class="mono">6</td><td>MAX4466 · <code>OUT</code></td><td>por cablear</td></tr>
+          <tr><td class="mono">6</td><td>MAX4466 · <code>OUT</code></td><td>cableado, sin firmware que lo lea</td></tr>
           <tr><td class="mono">7</td><td>DS18B20 · 1‑Wire, pull‑up 4,7 kΩ</td><td>funcionando</td></tr>
           <tr><td class="mono">47</td><td>Dosificador · <code>RPWM</code> del BTS7960</td><td>calibrado</td></tr>
           <tr><td class="mono">48</td><td>Aspersor · <code>RPWM</code> del BTS7960</td><td>calibrado</td></tr>

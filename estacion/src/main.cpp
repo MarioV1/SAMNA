@@ -380,9 +380,18 @@ static void taskLora(void *arg) {
     TlmPacket tlm;
     if (linkTakeTlm(&tlm)) {
       const LinkStats *s = linkStats();
-      logf("[RX tlm  seq=%-5u] %.2f C  pH %.2f  ruido %u  estado 0x%02X"
+      /* El ruido se imprime aparte porque un 0 con el micro caido y un 0
+       * con la piscina callada son el mismo numero y cosas distintas. */
+      char sndTxt[16];
+      if ((tlm.status & ST_SOUND_FAULT) != 0) {
+        snprintf(sndTxt, sizeof(sndTxt), "SIN MICRO");
+      } else {
+        snprintf(sndTxt, sizeof(sndTxt), "%u/100", tlm.soundLevel);
+      }
+
+      logf("[RX tlm  seq=%-5u] %.2f C  pH %.2f  ruido %-9s  estado 0x%02X"
            "  RSSI %d dBm  SNR %.1f dB  perdidos %lu\n",
-           tlm.hdr.seq, tlm.temperature, tlm.ph, tlm.soundLevel, tlm.status,
+           tlm.hdr.seq, tlm.temperature, tlm.ph, sndTxt, tlm.status,
            s->rssi, s->snr, (unsigned long)s->lost);
       /* Se pasa a la red para el paso 4d. Si la cola esta llena se descarta:
        * mas vale perder una muestra que frenar la tarea de la radio. */

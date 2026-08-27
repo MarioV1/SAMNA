@@ -85,7 +85,7 @@ bool firebaseTakeStop();
  *
  *   /temperatura   float
  *   /ph            float
- *   /nivelSonido   int
+ *   /nivelSonido   int, indice de actividad 0-100
  *
  * Una sola escritura y no tres: tres peticiones son tres viajes de red, y
  * ademas la app podria leer un estado a medias, con la temperatura nueva y
@@ -97,6 +97,9 @@ bool firebaseTakeStop();
  * la app no distinguiria "el agua esta a 0 grados" de "la sonda esta rota",
  * y el ultimo valor bueno que quedo en la base es mas util que un cero
  * inventado.
+ *
+ * /nivelSonido es un entero y no puede llevar NAN, asi que se omite cuando
+ * viene ST_SOUND_FAULT en el estado. Mismo criterio, distinto centinela.
  *
  * Devuelve false si no habia nada que escribir, si no toca todavia por
  * ritmo, o si la escritura fallo.
@@ -131,7 +134,8 @@ typedef struct {
   uint32_t totalCallMs; /* suma, para sacar la media              */
   uint32_t writes;      /* telemetrias escritas con exito         */
   uint32_t writeFails;  /* escrituras que fallaron                */
-  uint32_t skippedNan;  /* claves omitidas por venir en NAN       */
+  uint32_t skippedNan;  /* claves omitidas por sensor caido: NAN en
+                         * temperatura y pH, ST_SOUND_FAULT en el ruido */
 } FbStats;
 
 const FbStats *firebaseStats();

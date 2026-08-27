@@ -376,6 +376,11 @@ static void handleCmd(const CmdPacket &cmd) {
  *  procedimiento de banco y no una edicion de codigo.
  * ------------------------------------------------------------------ */
 
+/* Monitor de sonido en marcha. Se imprime desde loop() y no desde un bucle
+ * aqui dentro: la consola no puede quedarse dando vueltas mientras la radio
+ * espera comandos de navegacion. */
+static bool soundMonitor = false;
+
 static void printPhHelp() {
   const PhStats *p = sensorPhStats();
   Serial.println(F("\n--- calibracion de pH ----------------------------"));
@@ -406,6 +411,37 @@ static void printPhHelp() {
   Serial.println(F("    ca <ph>   primer punto de una calibracion de dos"));
   Serial.println(F("    cb <ph>   segundo punto; calcula pendiente y guarda"));
   Serial.println(F("    cr        borrar la calibracion de pH"));
+
+  const SoundStats *sn = sensorSoundStats();
+  Serial.println(F("\n--- sonido (MAX4466) -----------------------------"));
+  if (!sensorSoundOk()) {
+    Serial.printf("  SIN MICROFONO: reposo %u cuentas, fuera de la banda\n"
+                  "  de un modulo a 3V3. Comprueba VCC en 3V3 (nunca 5 V),\n"
+                  "  masa comun, y OUT en el GPIO %d.\n",
+                  sn->bias, PIN_SOUND_ADC);
+  } else {
+    Serial.printf("  nivel %u/100   pico a pico %u cuentas\n",
+                  sn->level, sn->peakToPeak);
+    Serial.printf("  reposo %u cuentas   min %u   max %u\n",
+                  sn->bias, sn->minCount, sn->maxCount);
+  }
+  Serial.printf("  fondo de escala %u cuentas  (%s)\n", sn->fullScale,
+                sn->calibrated ? "medido en banco"
+                               : "PROVISIONAL, sin medir");
+  if (!sn->calibrated) {
+    Serial.println(F("  Mientras sea provisional el 0-100 es orientativo:\n"
+                     "  ordena bien de menos a mas ruido, pero el 100 no\n"
+                     "  corresponde a nada medido. Fijalo con 'mc'."));
+  }
+  Serial.printf("  ventanas %lu   muestras/ventana %lu   al tope %lu   fallos %lu\n",
+                (unsigned long)sn->windows, (unsigned long)sn->samples,
+                (unsigned long)sn->clipped, (unsigned long)sn->faults);
+  Serial.println(F("\n  sonido:"));
+  Serial.println(F("    mm        monitor continuo, para girar la ganancia"));
+  Serial.println(F("              viendo el numero. Cualquier tecla sale"));
+  Serial.println(F("    mc        fijar el fondo de escala al pico a pico"));
+  Serial.println(F("              actual: hazlo con el ruido que deba dar 100"));
+  Serial.println(F("    mr        volver al fondo de escala provisional"));
 
   const ActStats *as = actuatorsStats();
   Serial.println(F("\n--- actuadores -----------------------------------"));
@@ -462,6 +498,18 @@ static void printPhHelp() {
 
 static void handleLine(char *line) {
   while (*line == ' ') { line++; }
+
+  /* El monitor de sonido se corta con cualquier linea, incluida una vacia:
+   * quien lo tiene delante esta girando un potenciometro con las dos manos
+   * y lo que quiere es que pare, no acordarse de un comando. */
+  if (soundMonitor) {
+    soundMonitor = false;
+    Serial.println(F("[MIC] monitor detenido."));
+    if (*line == '\0') {
+      return;
+    }
+  }
+
   if (*line == '\0') {
     return;
   }
@@ -474,6 +522,38 @@ static void handleLine(char *line) {
   if (strncmp(line, "cr", 2) == 0) {
     sensorPhCalReset();
     Serial.println(F("[pH] calibracion borrada. sensorPh() devuelve NAN."));
+    return;
+  }
+
+  if (strncmp(line, "mm", 2) == 0) {
+    soundMonitor = true;
+    Serial.println(F("[MIC] monitor en marcha. Gira el potenciometro del\n"
+                     "      modulo y mira el pico a pico: si se pega al tope\n"
+                     "      de 4095 cuentas, baja la ganancia.\n"
+                     "      Enter para salir."));
+    return;
+  }
+
+  if (strncmp(line, "mc", 2) == 0) {
+    const SoundStats *sn = sensorSoundStats();
+    if (sensorSoundCalFullScale()) {
+      Serial.printf("[MIC] fondo de escala fijado en %u cuentas de pico a\n"
+                    "      pico. Ese ruido es ahora el 100. Guardado en NVS.\n",
+                    sn->fullScale);
+    } else if (!sensorSoundOk()) {
+      Serial.println(F("[MIC] no se puede: el modulo no responde. Mira '?'."));
+    } else {
+      Serial.printf("[MIC] no se puede: pico a pico %u, demasiado bajo para\n"
+                    "      servir de referencia. Sube la ganancia del modulo\n"
+                    "      o haz mas ruido y vuelve a intentarlo.\n",
+                    sn->peakToPeak);
+    }
+    return;
+  }
+
+  if (strncmp(line, "mr", 2) == 0) {
+    sensorSoundCalReset();
+    Serial.println(F("[MIC] fondo de escala de vuelta al provisional."));
     return;
   }
 
@@ -791,8 +871,6 @@ static void sendTelemetry() {
   TlmPacket tlm;
   memset(&tlm, 0, sizeof(tlm));
 
-  const float t = millis() / 1000.0f;
-
   /* Temperatura REAL — DS18B20, paso 5a. NAN si la sonda no responde, y
    * entonces Estacion omite la clave en Firebase en vez de escribir un cero
    * que la app confundiria con agua helada. */
@@ -803,14 +881,17 @@ static void sendTelemetry() {
    * peor que no publicar nada. */
   tlm.ph = sensorPh();
 
-  /* VALOR FALSO todavia. El MAX4466 es el paso 5c y aun no ha llegado. */
-  tlm.soundLevel = (uint16_t)(400 + 200 * (0.5f + 0.5f * sinf(t / 7.0f)));
+  /* Sonido REAL — MAX4466, paso 5c. Indice 0-100, no cuentas del ADC.
+   * Si el modulo no esta, el bit ST_SOUND_FAULT hace que Estacion omita la
+   * clave: un cero se leeria en la app como piscina en silencio. */
+  tlm.soundLevel = sensorSoundLevel();
 
   tlm.status = 0;
   if (actuatorsBusy()) { tlm.status |= ST_DOSING; }
   if (navActive)       { tlm.status |= ST_NAV_ACTIVE; }
   if (!sensorTempOk()) { tlm.status |= ST_TEMP_FAULT; }
   if (!sensorPhOk())   { tlm.status |= ST_PH_FAULT; }
+  if (!sensorSoundOk()) { tlm.status |= ST_SOUND_FAULT; }
   if (thrustersArmed()) { tlm.status |= ST_ESC_ARMED; }
 
   const bool ok = linkSendTlm(&tlm);
@@ -832,8 +913,20 @@ static void sendTelemetry() {
     snprintf(phTxt, sizeof(phTxt), "pH s/cal %.2fV", sensorPhVolts());
   }
 
-  Serial.printf("[TX tlm  seq=%-5u] %-9s  %-14s  ruido %u  estado 0x%02X  %s\n",
-                tlm.hdr.seq, tempTxt, phTxt, tlm.soundLevel, tlm.status,
+  /* El indice de sonido tambien se imprime aparte: un 0 con el modulo
+   * caido y un 0 con la piscina en silencio son el mismo numero y cosas
+   * distintas. Se acompaña del pico a pico crudo, que es lo que sirve para
+   * ajustar la ganancia y para fijar el fondo de escala. */
+  char sndTxt[24];
+  if (sensorSoundOk()) {
+    snprintf(sndTxt, sizeof(sndTxt), "ruido %u/100 (pp %u)",
+             tlm.soundLevel, sensorSoundPeakToPeak());
+  } else {
+    snprintf(sndTxt, sizeof(sndTxt), "ruido SIN MICRO");
+  }
+
+  Serial.printf("[TX tlm  seq=%-5u] %-9s  %-14s  %-22s  estado 0x%02X  %s\n",
+                tlm.hdr.seq, tempTxt, phTxt, sndTxt, tlm.status,
                 ok ? "ok" : "FALLO");
 
   Serial.printf("          enlace: rx %lu  malos %lu  perdidos %lu  tx %lu/%lu\n",
@@ -886,6 +979,25 @@ void loop() {
   /* thrustersPoll() ya NO se llama aqui: es de taskSafety, y llamarlo desde
    * dos sitios haria avanzar la rampa al doble de velocidad. */
   pollConsole();
+
+  /* Monitor del microfono: una linea cada 300 ms mientras 'mm' este activo.
+   * Se imprime aqui para que el bucle siga girando y la radio siga
+   * escuchando mientras se ajusta la ganancia. */
+  if (soundMonitor) {
+    static uint32_t lastMon = 0;
+    if ((loopStart - lastMon) >= 300) {
+      lastMon = loopStart;
+      const SoundStats *sn = sensorSoundStats();
+      if (sensorSoundOk()) {
+        Serial.printf("[MIC] nivel %3u/100   pp %4u   reposo %4u   "
+                      "min %4u  max %4u\n",
+                      sn->level, sn->peakToPeak, sn->bias,
+                      sn->minCount, sn->maxCount);
+      } else {
+        Serial.printf("[MIC] SIN MICROFONO: reposo %u cuentas\n", sn->bias);
+      }
+    }
+  }
 
   CmdPacket cmd;
   if (linkTakeCmd(&cmd)) {

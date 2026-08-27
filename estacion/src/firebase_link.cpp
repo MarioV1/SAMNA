@@ -366,9 +366,19 @@ bool firebaseWriteTlm(const TlmPacket *tlm) {
     stats.skippedNan++;
   }
 
-  /* El nivel de sonido es un entero del ADC: no tiene forma de venir en NAN. */
-  json.set("nivelSonido", (int)tlm->soundLevel);
-  fields++;
+  /*
+   * El nivel de sonido es un entero 0-100 y no puede llevar NAN, asi que su
+   * centinela es el bit ST_SOUND_FAULT. Se omite igual que las otras dos
+   * claves: publicar el 0 que manda Piscina con el modulo caido lo leeria
+   * la app como una piscina en silencio, que es justo la conclusion
+   * contraria a la verdadera.
+   */
+  if ((tlm->status & ST_SOUND_FAULT) == 0) {
+    json.set("nivelSonido", (int)tlm->soundLevel);
+    fields++;
+  } else {
+    stats.skippedNan++;
+  }
 
   if (fields == 0) {
     return false;

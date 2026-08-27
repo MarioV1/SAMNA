@@ -203,12 +203,28 @@ typedef struct __attribute__((packed)) {
 #define ST_NAV_ACTIVE  (1u << 2)  /* propulsores fuera de neutro */
 #define ST_TEMP_FAULT  (1u << 3)  /* DS18B20 no responde */
 #define ST_PH_FAULT    (1u << 4)  /* lectura de pH fuera de rango fisico */
+#define ST_SOUND_FAULT (1u << 5)  /* el MAX4466 no parece estar conectado */
 
 typedef struct __attribute__((packed)) {
   MsgHeader hdr;
   float     temperature;  /* DS18B20, grados C. NAN si el sensor fallo */
   float     ph;           /* sonda de pH, 0-14.  NAN si el sensor fallo */
-  uint16_t  soundLevel;   /* MAX4466, cuentas del ADC */
+
+  /*
+   * MAX4466 — indice de actividad de alimentacion, 0-100.
+   *
+   * NO son cuentas del ADC. Es la amplitud pico a pico de la ventana,
+   * normalizada contra un fondo de escala medido en banco: 0 es silencio y
+   * 100 es ese fondo de escala. Se publica 0-100 y no la cuenta cruda
+   * porque esta reposa en torno a 2048 con la piscina en silencio, y un
+   * numero que nunca baja de 2000 no se parece a un nivel.
+   *
+   * Un entero no puede llevar NAN, asi que el centinela equivalente al de
+   * los otros dos sensores es el bit ST_SOUND_FAULT: cuando esta puesto,
+   * Estacion omite la clave en vez de publicar un cero que la app leeria
+   * como silencio.
+   */
+  uint16_t  soundLevel;   /* MAX4466, indice 0-100 */
   uint8_t   status;       /* bitfield ST_* */
   uint8_t   _pad;         /* alineacion; debe ir en 0 */
 } TlmPacket;

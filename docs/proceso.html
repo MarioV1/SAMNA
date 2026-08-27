@@ -386,7 +386,7 @@
         <div class="num">09 ago</div><div class="dot"></div>
         <div class="body">
           <div class="t">5 · Sensores, uno a uno</div>
-          <div class="d">DS18B20 y pH cerrados con sensores reales. El MAX4466 quedó programado sin probar: no había llegado.</div>
+          <div class="d">DS18B20 y pH cerrados con sensores reales. El MAX4466 no había llegado y quedó con un valor falso en su sitio, para poder probar la cadena entera sin él.</div>
         </div>
       </div>
       <div class="ph">
@@ -549,8 +549,8 @@
           <tr>
             <td class="mono">5c</td>
             <td>MAX4466 — nivel de sonido como indicador de actividad de alimentación</td>
-            <td>—</td>
-            <td><span class="pill pend">pendiente</span></td>
+            <td>Cableado el 27 ago y <code>OUT</code> comprobado a ≈ 1,65 V. Sin código todavía</td>
+            <td><span class="pill pend">sin firmware</span></td>
           </tr>
 
           <tr class="phase"><td colspan="4">Paso 6 · Actuadores de alimentación<span class="date">10 ago</span></td></tr>
@@ -866,7 +866,7 @@
         </thead>
         <tbody>
           <tr><td>Probar los brushless: que los ESC armen y los ejes giren bien</td><td>Los motores están en el laboratorio</td></tr>
-          <tr><td>Cablear y verificar el MAX4466 (5c)</td><td>El sensor no había llegado</td></tr>
+          <tr><td>Escribir la lectura del MAX4466 (5c): el módulo ya está cableado y comprobado, pero nadie lee el GPIO 6 — <code>/nivelSonido</code> publica todavía un valor falso</td><td>—</td></tr>
           <tr><td>Corregir <code>Aspersion.java</code>: la app ancla nivel 0 = 1 m, el firmware ancla nivel 1 = 1 m y reserva el 0 para apagar</td><td>Cambio en la app Android</td></tr>
           <tr><td>Añadir <code>paro.put("paro", true)</code> al botón de PARO de la app</td><td>Cambio en la app Android</td></tr>
           <tr><td>Recalibrar el pH con buffers de 4,00 y 7,00</td><td>La calibración actual se hizo con tiras reactivas</td></tr>
