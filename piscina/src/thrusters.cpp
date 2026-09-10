@@ -59,7 +59,7 @@ static uint16_t usReverse() {
 }
 
 /*
- * Mezcla diferencial. Es la tabla de CLAUDE.md y no debe divergir de ella:
+ * Mezcla diferencial. Es la tabla de mezcla diferencial del proyecto:
  *
  *   comando       babor      estribor
  *   NAV_FORWARD   adelante   adelante

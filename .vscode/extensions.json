@@ -1,7 +1,6 @@
 {
   "recommendations": [
     "platformio.platformio-ide",
-    "anthropic.claude-code",
     "ms-vscode.cpptools"
   ],
   "unwantedRecommendations": [

@@ -58,7 +58,7 @@ static bool     navActive = false;
  *  requisito temporal, y cada tarea nueva es superficie para errores de
  *  concurrencia que este bucle hoy no tiene.
  *
- *  COMUNICACION POR COLA, como pide CLAUDE.md. El bucle no llama a
+ *  COMUNICACION POR COLA, por convencion del proyecto. El bucle no llama a
  *  thrustersSetNav(): empuja la intencion a una cola y la tarea la aplica.
  *  Asi hay un solo dueño del estado de los propulsores.
  * ================================================================== */
